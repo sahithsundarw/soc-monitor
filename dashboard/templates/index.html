@@ -7,31 +7,68 @@
     <link rel="icon" href="data:,">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   </head>
-  <body>
+  <body class="is-loading">
+    <!-- Icon sprite: 16px stroke icons drawn inline so the page works offline. -->
+    <svg class="sprite" aria-hidden="true" focusable="false">
+      <symbol id="i-shield" viewBox="0 0 16 16"><path d="M8 1.5 2.5 3.5v4c0 3.4 2.3 5.9 5.5 7 3.2-1.1 5.5-3.6 5.5-7v-4z"/><path d="m5.6 8 1.7 1.7L10.6 6.4"/></symbol>
+      <symbol id="i-overview" viewBox="0 0 16 16"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></symbol>
+      <symbol id="i-topology" viewBox="0 0 16 16"><circle cx="3.5" cy="4" r="1.8"/><circle cx="12.5" cy="4" r="1.8"/><circle cx="8" cy="12" r="1.8"/><path d="M5.3 4h5.4M4.5 5.5l2.6 4.9M11.5 5.5l-2.6 4.9"/></symbol>
+      <symbol id="i-layers" viewBox="0 0 16 16"><path d="M8 2 1.8 5.2 8 8.4l6.2-3.2z"/><path d="m1.8 8.2 6.2 3.2 6.2-3.2"/><path d="m1.8 11 6.2 3.2 6.2-3.2"/></symbol>
+      <symbol id="i-sliders" viewBox="0 0 16 16"><path d="M2 4h7M12 4h2M2 12h2M7 12h7M2 8h4M9 8h5"/><circle cx="10.5" cy="4" r="1.5"/><circle cx="5.5" cy="12" r="1.5"/><circle cx="7.5" cy="8" r="1.5"/></symbol>
+      <symbol id="i-terminal" viewBox="0 0 16 16"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="m4.5 6.5 2 1.8-2 1.8M8.5 10.5h3"/></symbol>
+      <symbol id="i-file" viewBox="0 0 16 16"><path d="M9.5 1.5H4A1.5 1.5 0 0 0 2.5 3v10A1.5 1.5 0 0 0 4 14.5h8a1.5 1.5 0 0 0 1.5-1.5V5.5z"/><path d="M9.5 1.5v4h4M5.5 9h5M5.5 11.5h5"/></symbol>
+      <symbol id="i-mail" viewBox="0 0 16 16"><rect x="1.5" y="3" width="13" height="10" rx="1.5"/><path d="m2 4 6 5 6-5"/></symbol>
+      <symbol id="i-moon" viewBox="0 0 16 16"><path d="M13.5 9.6A5.8 5.8 0 0 1 6.4 2.5a5.8 5.8 0 1 0 7.1 7.1z"/></symbol>
+      <symbol id="i-sun" viewBox="0 0 16 16"><circle cx="8" cy="8" r="3"/><path d="M8 1v1.5M8 13.5V15M1 8h1.5M13.5 8H15M3 3l1 1M12 12l1 1M3 13l1-1M12 4l1-1"/></symbol>
+      <symbol id="i-sensor" viewBox="0 0 16 16"><path d="M8 1.5 2.5 3.5v4c0 3.4 2.3 5.9 5.5 7 3.2-1.1 5.5-3.6 5.5-7v-4z"/></symbol>
+      <symbol id="i-router" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6"/><path d="M8 4.5v7M4.5 8h7M8 4.5 6.8 5.7M8 4.5l1.2 1.2M8 11.5l-1.2-1.2M8 11.5l1.2-1.2"/></symbol>
+      <symbol id="i-target" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="3.2"/><circle cx="8" cy="8" r=".6"/></symbol>
+      <symbol id="i-copy" viewBox="0 0 16 16"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 5.5V4A1.5 1.5 0 0 0 9 2.5H4A1.5 1.5 0 0 0 2.5 4v5A1.5 1.5 0 0 0 4 10.5h1.5"/></symbol>
+    </svg>
+
     <aside class="sidebar">
       <div class="brand">
-        <span class="brand-mark" aria-hidden="true"></span>
-        <span>SOC Monitor</span>
+        <svg class="brand-mark" aria-hidden="true"><use href="#i-shield"/></svg>
+        <div class="brand-text">
+          <span class="brand-name">SOC Monitor</span>
+          <span class="brand-sub">Network telemetry console</span>
+        </div>
       </div>
       <nav class="nav" aria-label="Sections">
-        <button class="nav-item is-active" data-tab="overview">Overview</button>
-        <button class="nav-item" data-tab="topology">Topology</button>
-        <button class="nav-item" data-tab="controls">Controls</button>
-        <button class="nav-item" data-tab="inspector">Packet Inspector</button>
-        <button class="nav-item" data-tab="reports">Reports</button>
-        <button class="nav-item" data-tab="emails">Emails</button>
-        <button class="nav-item" data-tab="diagnostics">Diagnostics</button>
+        <p class="nav-group">Monitor</p>
+        <button class="nav-item is-active" data-tab="overview"><svg class="icon" aria-hidden="true"><use href="#i-overview"/></svg>Overview</button>
+        <button class="nav-item" data-tab="topology"><svg class="icon" aria-hidden="true"><use href="#i-topology"/></svg>Topology</button>
+        <button class="nav-item" data-tab="inspector"><svg class="icon" aria-hidden="true"><use href="#i-layers"/></svg>Packet Inspector</button>
+        <p class="nav-group">Operate</p>
+        <button class="nav-item" data-tab="controls"><svg class="icon" aria-hidden="true"><use href="#i-sliders"/></svg>Controls</button>
+        <button class="nav-item" data-tab="diagnostics"><svg class="icon" aria-hidden="true"><use href="#i-terminal"/></svg>Diagnostics</button>
+        <p class="nav-group">Archive</p>
+        <button class="nav-item" data-tab="reports"><svg class="icon" aria-hidden="true"><use href="#i-file"/></svg>Reports</button>
+        <button class="nav-item" data-tab="emails"><svg class="icon" aria-hidden="true"><use href="#i-mail"/></svg>Emails<span class="nav-count" id="nav-email-count" hidden>0</span></button>
       </nav>
-      <button class="theme-toggle" id="theme-toggle" type="button">Dark mode</button>
+      <div class="sidebar-foot">
+        <dl class="link-info" aria-label="Live link settings">
+          <div><dt>Framing</dt><dd id="side-method">-</dd></div>
+          <div><dt>CRC</dt><dd id="side-crc">-</dd></div>
+          <div><dt>Line noise</dt><dd id="side-noise">-</dd></div>
+        </dl>
+        <button class="theme-toggle" id="theme-toggle" type="button">
+          <svg class="icon" aria-hidden="true"><use id="theme-icon" href="#i-moon"/></svg>
+          <span id="theme-label">Dark mode</span>
+        </button>
+      </div>
     </aside>
 
     <header class="topbar">
       <h1 class="page-title" id="page-title">Overview</h1>
       <div class="topbar-stats">
         <span class="status-pill" id="status-pill" data-state="loading">Connecting</span>
+        <span class="topbar-meta" id="top-uptime"></span>
+        <span class="topbar-meta" id="top-updated"></span>
+        <span class="topbar-divider" aria-hidden="true"></span>
         <span class="topbar-counter"><strong id="top-events">0</strong> <span id="top-events-label">events</span></span>
         <span class="topbar-counter"><strong id="top-alerts">0</strong> <span id="top-alerts-label">alerts</span></span>
-        <span class="topbar-counter">S1 route <strong class="mono" id="top-route">-</strong></span>
+        <span class="topbar-counter route-chip">Route <strong class="mono" id="top-route">-</strong></span>
       </div>
     </header>
 
@@ -39,42 +76,64 @@
       <!-- Overview -->
       <section class="tab is-active" id="tab-overview">
         <div class="tiles">
-          <div class="tile"><span class="tile-label">Events received</span><span class="tile-value" id="tile-events">0</span></div>
-          <div class="tile"><span class="tile-label">Alerts</span><span class="tile-value" id="tile-alerts">0</span></div>
-          <div class="tile"><span class="tile-label">Corrupted frames</span><span class="tile-value" id="tile-corrupted">0</span></div>
-          <div class="tile"><span class="tile-label">Retransmissions</span><span class="tile-value" id="tile-retransmissions">0</span></div>
-          <div class="tile"><span class="tile-label">Firewall blocks</span><span class="tile-value" id="tile-firewall_blocks">0</span></div>
+          {% for key, label in [("events", "Events received"), ("alerts", "Alerts"), ("corrupted", "Corrupted frames"), ("retransmissions", "Retransmissions"), ("firewall_blocks", "Firewall blocks")] %}
+          <div class="tile">
+            <span class="tile-label">{{ label }}</span>
+            <div class="tile-main">
+              <span class="tile-value" id="tile-{{ key }}"><span class="skeleton skeleton-number"></span></span>
+              <svg class="spark" id="spark-{{ key }}" viewBox="0 0 120 28" preserveAspectRatio="none" aria-hidden="true"></svg>
+            </div>
+            <span class="tile-rate" id="rate-{{ key }}"><span class="skeleton skeleton-text"></span></span>
+          </div>
+          {% endfor %}
         </div>
         <div class="grid">
-          <article class="card span-7 card-tall">
-            <h2 class="card-title">Live alerts</h2>
+          <article class="card span-7 card-feed">
+            <div class="card-head">
+              <h2 class="card-title">Live alerts</h2>
+              <div class="chips" id="severity-chips" role="group" aria-label="Filter alerts by severity">
+                <button type="button" class="chip is-active" data-severity="ALL">All <span class="chip-count" id="chip-ALL">0</span></button>
+                {% for sev in ["CRITICAL", "HIGH", "MEDIUM", "LOW"] %}
+                <button type="button" class="chip chip-{{ sev }}" data-severity="{{ sev }}"><i class="chip-dot" aria-hidden="true"></i>{{ sev|capitalize }} <span class="chip-count" id="chip-{{ sev }}">0</span></button>
+                {% endfor %}
+              </div>
+            </div>
             <ul class="alert-feed" id="alert-feed"></ul>
             <p class="empty" id="alert-empty">No alerts yet. Launch an attack from Controls to see one.</p>
           </article>
           <article class="card span-5">
-            <h2 class="card-title">Token bucket, last 60 s</h2>
-            <canvas class="chart" id="qos-chart" height="200" aria-label="Allowed and dropped frames per second"></canvas>
+            <div class="card-head">
+              <h2 class="card-title">Token bucket</h2>
+              <span class="card-meta">frames per second, last 60 s</span>
+            </div>
+            <div class="chart-wrap" id="qos-wrap">
+              <canvas class="chart" id="qos-chart" aria-label="Allowed and dropped frames per second over the last 60 seconds"></canvas>
+              <div class="chart-tip" id="qos-tip" hidden></div>
+              <span class="skeleton skeleton-chart"></span>
+            </div>
             <div class="legend">
               <span><i class="swatch swatch-allowed"></i>Allowed</span>
-              <span><i class="swatch swatch-dropped"></i>Dropped</span>
+              <span><i class="swatch swatch-dropped"></i>Dropped by the token bucket</span>
             </div>
           </article>
           <article class="card span-5">
             <h2 class="card-title">UDP vs TCP</h2>
-            <div class="split-bar" id="split-bar"><span class="split-udp"></span><span class="split-tcp"></span></div>
-            <div class="split-labels">
-              <span><i class="swatch swatch-allowed"></i>UDP routine <strong id="split-udp">0</strong></span>
-              <span><i class="swatch swatch-dropped"></i>TCP high priority <strong id="split-tcp">0</strong></span>
+            <div class="split-figures">
+              <div><span class="split-share" id="share-udp">0%</span><span class="split-name"><i class="swatch swatch-allowed"></i>UDP routine</span><span class="split-count" id="split-udp">0 frames</span></div>
+              <div><span class="split-share" id="share-tcp">0%</span><span class="split-name"><i class="swatch swatch-dropped"></i>TCP high priority</span><span class="split-count" id="split-tcp">0 frames</span></div>
             </div>
+            <div class="split-bar" id="split-bar"><span class="split-udp"></span><span class="split-tcp"></span></div>
           </article>
           <article class="card span-12">
             <h2 class="card-title">Frames per sensor</h2>
-            <table class="table" id="sensor-table">
-              <thead>
-                <tr><th>Sensor</th><th>Protocol</th><th class="num">Good</th><th class="num">Corrupted</th><th class="num">Retransmitted</th><th class="num">Lost</th></tr>
-              </thead>
-              <tbody></tbody>
-            </table>
+            <div class="table-scroll">
+              <table class="table" id="sensor-table">
+                <thead>
+                  <tr><th>Sensor</th><th class="num">Good UDP</th><th class="num">Good TCP</th><th class="num">Corrupted</th><th class="num">Retransmitted</th><th class="num">Lost</th></tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
           </article>
         </div>
       </section>
@@ -92,17 +151,30 @@
               </div>
             </div>
             <svg class="topology" id="topology" viewBox="24 48 752 324" role="img" aria-label="Network topology"></svg>
-            <p class="route-line" id="route-line">Loading topology</p>
+            <div class="topo-foot">
+              <p class="route-line" id="route-line">Loading topology</p>
+              <ul class="topo-legend" aria-label="Legend">
+                <li><svg viewBox="0 0 28 8" aria-hidden="true"><line class="legend-route" x1="1" y1="4" x2="27" y2="4"/></svg>Current route</li>
+                <li><svg viewBox="0 0 28 8" aria-hidden="true"><line class="legend-up" x1="1" y1="4" x2="27" y2="4"/></svg>Link up (cost)</li>
+                <li><svg viewBox="0 0 28 8" aria-hidden="true"><line class="legend-down" x1="1" y1="4" x2="27" y2="4"/></svg>Link down</li>
+                <li><svg class="icon" aria-hidden="true"><use href="#i-sensor"/></svg>Sensor</li>
+                <li><svg class="icon" aria-hidden="true"><use href="#i-router"/></svg>Router</li>
+                <li><svg class="icon" aria-hidden="true"><use href="#i-target"/></svg>SOC</li>
+              </ul>
+            </div>
           </article>
           <article class="card span-5">
             <h2 class="card-title">Links</h2>
             <table class="table" id="link-table">
-              <thead><tr><th>Link</th><th class="num">Cost</th><th>State</th><th></th></tr></thead>
+              <thead><tr><th>Link</th><th class="num">Cost</th><th>State</th><th class="num"><span class="sr-only">Action</span></th></tr></thead>
               <tbody></tbody>
             </table>
           </article>
           <article class="card span-7">
-            <h2 class="card-title">Forwarding tables (next hop)</h2>
+            <div class="card-head">
+              <h2 class="card-title">Forwarding tables</h2>
+              <span class="card-meta">next hop from each router to each destination</span>
+            </div>
             <div class="table-scroll">
               <table class="table mono-cells" id="fwd-table"><thead></thead><tbody></tbody></table>
             </div>
@@ -112,7 +184,7 @@
 
       <!-- Controls -->
       <section class="tab" id="tab-controls">
-        <div class="grid">
+        <div class="grid grid-even">
           <article class="card span-6">
             <h2 class="card-title">Line noise</h2>
             <p class="hint">Chance that a frame is damaged on each link it crosses. Damaged frames fail the CRC and are NAKed.</p>
@@ -120,11 +192,14 @@
               <input type="range" id="noise-slider" min="0" max="50" step="1" value="0" aria-label="Frame error rate">
               <span class="slider-value" id="noise-value">0%</span>
             </div>
-            <button class="btn btn-primary" id="noise-apply" type="button">Apply noise</button>
+            <div class="slider-ticks" aria-hidden="true"><span>0%</span><span>25%</span><span>50%</span></div>
+            <div class="card-actions">
+              <button class="btn btn-primary" id="noise-apply" type="button">Apply noise</button>
+            </div>
           </article>
           <article class="card span-6">
             <h2 class="card-title">Link layer</h2>
-            <p class="hint">Sender and receivers switch together.</p>
+            <p class="hint">Every sender and receiver switches at the same moment.</p>
             <div class="field">
               <span class="field-label">Framing</span>
               <div class="segmented" id="method-picker" role="group" aria-label="Framing method">
@@ -145,25 +220,42 @@
           <article class="card span-6">
             <h2 class="card-title">Attacks</h2>
             <p class="hint">Each attack is a burst of real events sent through the network.</p>
-            <div class="button-row">
-              <button class="btn" type="button" data-attack="brute_force">Launch brute force</button>
-              <button class="btn" type="button" data-attack="port_scan">Launch port scan</button>
-              <button class="btn" type="button" data-attack="beacon">Start malware beacon</button>
-            </div>
+            <ul class="action-list">
+              <li>
+                <div><span class="action-name">Brute force</span><span class="action-desc">8 failed SSH logins for root from 192.168.1.55, reported by S3</span></div>
+                <button class="btn" type="button" data-attack="brute_force" aria-label="Launch brute force">Launch</button>
+              </li>
+              <li>
+                <div><span class="action-name">Port scan</span><span class="action-desc">16 ports probed by 198.51.100.23, reported by S2</span></div>
+                <button class="btn" type="button" data-attack="port_scan" aria-label="Launch port scan">Launch</button>
+              </li>
+              <li>
+                <div><span class="action-name">Malware beacon</span><span class="action-desc">6 calls to 198.51.100.77 once a second, reported by S2</span></div>
+                <button class="btn" type="button" data-attack="beacon" aria-label="Start malware beacon">Start</button>
+              </li>
+            </ul>
           </article>
           <article class="card span-6">
             <h2 class="card-title">Flooding</h2>
             <p class="hint">A flood ignores Stop-and-Wait. The token bucket drops what exceeds the rate.</p>
             <div class="field">
-              <label class="field-label" for="flood-sensor">Sensor</label>
-              <select id="flood-sensor" class="select">
-                {% for sensor in sensors %}<option value="{{ sensor }}">{{ sensor }}</option>{% endfor %}
-              </select>
+              <span class="field-label">Sensor</span>
+              <div class="segmented" id="flood-picker" role="group" aria-label="Sensor to flood from">
+                {% for sensor in sensors %}
+                <button type="button" data-sensor="{{ sensor }}" class="{{ 'is-active' if loop.first else '' }}">{{ sensor }}</button>
+                {% endfor %}
+              </div>
             </div>
-            <div class="button-row">
-              <button class="btn" type="button" id="flood-btn">Flood from sensor</button>
-              <button class="btn" type="button" id="spoof-btn">Send from unknown IP</button>
-            </div>
+            <ul class="action-list">
+              <li>
+                <div><span class="action-name">Flood</span><span class="action-desc">150 frames at once from the selected sensor</span></div>
+                <button class="btn" type="button" id="flood-btn" aria-label="Flood from sensor">Flood</button>
+              </li>
+              <li>
+                <div><span class="action-name">Unknown source</span><span class="action-desc">10 frames spoofed from 203.0.113.66, which the firewall denies</span></div>
+                <button class="btn" type="button" id="spoof-btn" aria-label="Send from unknown IP">Send</button>
+              </li>
+            </ul>
           </article>
         </div>
       </section>
@@ -171,13 +263,16 @@
       <!-- Packet Inspector -->
       <section class="tab" id="tab-inspector">
         <div class="grid">
-          <article class="card span-4 card-tall">
-            <h2 class="card-title">Recent events</h2>
+          <article class="card span-4 card-list">
+            <div class="card-head">
+              <h2 class="card-title">Recent events</h2>
+              <span class="card-meta">latest 50</span>
+            </div>
             <ul class="event-list" id="event-list"></ul>
             <p class="empty" id="event-empty">Waiting for the first event</p>
           </article>
           <div class="span-8 layers" id="layers">
-            <article class="card"><p class="empty">Select an event to see it at each layer.</p></article>
+            <article class="card"><p class="empty">Select an event to see it at each layer, from the event JSON down to the stuffed frame.</p></article>
           </div>
         </div>
       </section>
@@ -187,11 +282,20 @@
         <div class="grid">
           <article class="card span-4">
             <h2 class="card-title">Daily alert report</h2>
-            <p class="hint">Writes today's alert summary as .txt and .csv and uploads both to the FTP server.</p>
-            <button class="btn btn-primary" id="report-btn" type="button">Generate &amp; upload report</button>
+            <p class="hint">Writes today's alert summary as .txt and .csv, then uploads both to the FTP server with ftplib.</p>
+            <dl class="kv kv-compact">
+              <dt>Server</dt><dd>{{ ftp_address }}</dd>
+              <dt>Last upload</dt><dd id="report-last">none this session</dd>
+            </dl>
+            <div class="card-actions">
+              <button class="btn btn-primary" id="report-btn" type="button">Generate &amp; upload report</button>
+            </div>
           </article>
           <article class="card span-8">
-            <h2 class="card-title">Files on the FTP server</h2>
+            <div class="card-head">
+              <h2 class="card-title">Files on the FTP server</h2>
+              <span class="card-meta">listed with MLSD</span>
+            </div>
             <table class="table" id="ftp-table">
               <thead><tr><th>File</th><th class="num">Size</th><th>Modified</th></tr></thead>
               <tbody></tbody>
@@ -204,12 +308,15 @@
       <!-- Emails -->
       <section class="tab" id="tab-emails">
         <div class="grid">
-          <article class="card span-5 card-tall">
-            <h2 class="card-title">Inbox</h2>
+          <article class="card span-5 card-list">
+            <div class="card-head">
+              <h2 class="card-title">Inbox</h2>
+              <span class="card-meta">HIGH and CRITICAL alerts</span>
+            </div>
             <ul class="inbox" id="inbox"></ul>
             <p class="empty" id="inbox-empty">No alert emails yet. HIGH and CRITICAL alerts are emailed here.</p>
           </article>
-          <article class="card span-7 card-tall">
+          <article class="card span-7 card-list">
             <h2 class="card-title" id="mail-subject">Message</h2>
             <p class="mail-meta" id="mail-meta"></p>
             <pre class="mail-body" id="mail-body">Select an email to read it.</pre>
@@ -226,10 +333,13 @@
               <label class="field-label" for="diag-target">Target</label>
               <select id="diag-target" class="select"></select>
             </div>
-            <div class="button-col" id="diag-buttons"></div>
+            <ul class="command-list" id="diag-buttons"></ul>
           </article>
           <article class="card span-8">
-            <h2 class="card-title" id="terminal-title">Output</h2>
+            <div class="card-head">
+              <h2 class="card-title" id="terminal-title">Output</h2>
+              <span class="card-meta mono" id="terminal-meta"></span>
+            </div>
             <pre class="terminal" id="terminal">Pick a command to run it here.</pre>
           </article>
         </div>

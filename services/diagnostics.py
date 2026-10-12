@@ -30,6 +30,7 @@ class CommandSpec:
     """
 
     label: str
+    summary: str
     windows: tuple[tuple[str, ...], ...]
     posix: tuple[tuple[str, ...], ...]
     needs_target: bool
@@ -38,12 +39,14 @@ class CommandSpec:
 COMMANDS = {
     "ping": CommandSpec(
         "Ping",
+        "ICMP echo: is the target reachable, and how fast?",
         (("ping", "-n", "4", "{target}"),),
         (("ping", "-c", "4", "{target}"),),
         True,
     ),
     "traceroute": CommandSpec(
         "Traceroute",
+        "Lists every router hop on the way to the target.",
         (("tracert", "-d", "-h", "8", "-w", "500", "{target}"),),
         (
             ("traceroute", "-n", "-m", "8", "-w", "1", "{target}"),
@@ -53,18 +56,21 @@ COMMANDS = {
     ),
     "netstat": CommandSpec(
         "Netstat (SOC Monitor ports)",
+        "Open UDP and TCP sockets on this project's ports.",
         (("netstat", "-an"),),
         (("netstat", "-an"), ("ss", "-tuan")),
         False,
     ),
     "ipconfig": CommandSpec(
         "Interface config",
+        "IP addresses and masks of this PC's interfaces.",
         (("ipconfig",),),
         (("ifconfig",), ("ip", "addr")),
         False,
     ),
     "arp": CommandSpec(
         "ARP table",
+        "IP-to-MAC address cache for the local network.",
         (("arp", "-a"),),
         (("arp", "-a"), ("ip", "neigh")),
         False,

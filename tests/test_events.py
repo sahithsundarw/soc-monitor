@@ -9,7 +9,7 @@ from soc.events import (
     EventFactory,
     priority_of,
 )
-from soc.state import SocState
+from soc.state import PerSecondTimeline, SocState
 
 KNOWN = ["192.168.1.20", "192.168.1.21"]
 
@@ -66,6 +66,40 @@ class SocStateTest(unittest.TestCase):
         self.state.add_event({"id": 1})
         self.state.add_event({"id": 2})
         self.assertEqual([e["id"] for e in self.state.recent_events()], [2, 1])
+
+
+class PerSecondTimelineTest(unittest.TestCase):
+    """Per-second buckets over a sliding 60 s window."""
+
+    def test_counts_group_by_second_and_window_is_sixty(self) -> None:
+        timeline = PerSecondTimeline(("a", "b"))
+        timeline.add("a", now=100.1)
+        timeline.add("a", 2, now=100.9)
+        timeline.add("b", now=101.0)
+        window = timeline.window(now=101.5)
+        self.assertEqual(len(window), 60)
+        self.assertEqual(window[-2], {"t": 100, "a": 3, "b": 0})
+        self.assertEqual(window[-1], {"t": 101, "a": 0, "b": 1})
+
+    def test_old_seconds_are_forgotten(self) -> None:
+        timeline = PerSecondTimeline(("a",))
+        timeline.add("a", now=100)
+        timeline.add("a", now=200)
+        self.assertEqual(sum(timeline.series("a", now=200)), 1)
+
+
+class TrendTest(unittest.TestCase):
+    """SocState feeds the sparkline series."""
+
+    def test_counts_and_marks_appear_in_trends(self) -> None:
+        state = SocState(["S1"])
+        state.count("S1", "udp", "good", 2)
+        state.count("S1", "udp", "lost")  # lost has no tile, so no trend
+        state.mark("firewall_blocks")
+        trends = state.trends()
+        self.assertEqual(sum(trends["good"]), 2)
+        self.assertEqual(sum(trends["firewall_blocks"]), 1)
+        self.assertNotIn("lost", trends)
 
 
 if __name__ == "__main__":

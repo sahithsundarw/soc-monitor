@@ -93,6 +93,12 @@ class DetectorTest(unittest.TestCase):
             self.detector.record_crc_failure("R2-SOC", now=100 + n)
         self.assertEqual(self.rules(), ["link_integrity"])
         self.assertEqual(self.alerts[0].source, "R2-SOC")
+        self.assertIn("arriving via R2-SOC", self.alerts[0].detail)
+
+    def test_crc_failures_with_unreadable_sender(self) -> None:
+        for n in range(5):
+            self.detector.record_crc_failure("unknown", now=100 + n)
+        self.assertIn("unreadable sender", self.alerts[0].detail)
 
     def test_cooldown_suppresses_repeats(self) -> None:
         for n in range(20):
@@ -123,6 +129,10 @@ class AlertStoreTest(unittest.TestCase):
         self.assertEqual(len(lines), 2)
         self.assertEqual(len(heard), 2)
         self.assertEqual(store.total, 2)
+        self.assertEqual(
+            store.counts_by_severity(),
+            {"LOW": 0, "MEDIUM": 0, "HIGH": 2, "CRITICAL": 0},
+        )
 
 
 if __name__ == "__main__":

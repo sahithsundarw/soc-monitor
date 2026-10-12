@@ -126,6 +126,7 @@ class Collector(Node):
             header.src_ip, self.info["port"], protocol, now
         )
         if not allowed:
+            self.state.mark("firewall_blocks")
             self.detector.report_firewall_block(header.src_ip, reason)
             return False
         if not self.policer.allow(header.src_id, now):

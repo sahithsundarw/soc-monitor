@@ -44,6 +44,7 @@ class AlertStore:
         self._lock = threading.Lock()
         self._alerts: deque[Alert] = deque(maxlen=RECENT_ALERT_LIMIT)
         self._total = 0
+        self._by_severity = dict.fromkeys(SEVERITIES, 0)
         self._listeners: list[Callable[[Alert], None]] = []
         if path is not None:
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -57,6 +58,7 @@ class AlertStore:
         with self._lock:
             self._alerts.appendleft(alert)
             self._total += 1
+            self._by_severity[alert.severity] += 1
             if self._path is not None:
                 with self._path.open("a", encoding="utf-8") as log_file:
                     log_file.write(json.dumps(asdict(alert)) + "\n")
@@ -68,6 +70,11 @@ class AlertStore:
         """Latest alerts as dictionaries, newest first."""
         with self._lock:
             return [asdict(alert) for alert in self._alerts]
+
+    def counts_by_severity(self) -> dict[str, int]:
+        """Alerts raised since start-up per severity (not limited to the recent list)."""
+        with self._lock:
+            return dict(self._by_severity)
 
     @property
     def total(self) -> int:
@@ -234,12 +241,18 @@ class Detector:
         with self._lock:
             count = self._crc_failures.add(link, now)
         if count >= self.rules["crc_fail_threshold"]:
+            # "unknown" means the damage hid the sender, so no link can be named.
+            where = (
+                "with an unreadable sender"
+                if link == "unknown"
+                else f"arriving via {link}"
+            )
             self.raise_alert(
                 "link_integrity",
                 "MEDIUM",
                 link,
                 "Link tampering or noise",
-                f"{count} CRC failures on frames arriving via {link} "
+                f"{count} CRC failures on frames {where} "
                 f"within {self.rules['crc_fail_window_s']} s",
                 now,
             )

@@ -8,6 +8,7 @@ response has the same shape: {"data": ..., "error": null | "message"}.
 import ftplib
 import logging
 import threading
+import time
 from typing import Any
 
 from flask import Flask, jsonify, render_template, request
@@ -70,6 +71,29 @@ def body() -> dict[str, Any]:
     return data
 
 
+# Dashboard tile name -> per-second series recorded in SocState.timeline.
+TILE_SERIES = {
+    "events": "good",
+    "alerts": "alerts",
+    "corrupted": "corrupted",
+    "retransmissions": "retransmitted",
+    "firewall_blocks": "firewall_blocks",
+}
+
+
+def tile_trends(system: SocSystem) -> dict[str, list[int]]:
+    """Last 60 seconds of each stat tile, one value per second, for sparklines."""
+    trends = system.state.trends()
+    return {tile: trends[series] for tile, series in TILE_SERIES.items()}
+
+
+def uptime_seconds(system: SocSystem) -> int | None:
+    """Seconds since the system started, or None while it is stopped."""
+    if system.started_at is None or not system.running:
+        return None
+    return int(time.time() - system.started_at)
+
+
 def status_payload(system: SocSystem) -> dict[str, Any]:
     """Everything the top bar and Overview tab show."""
     totals = system.state.totals()
@@ -85,6 +109,10 @@ def status_payload(system: SocSystem) -> dict[str, Any]:
             "firewall_blocks": firewall["blocked"],
         },
         "lost": totals["lost"],
+        "trends": tile_trends(system),
+        "severity_counts": system.alerts.counts_by_severity(),
+        "uptime_s": uptime_seconds(system),
+        "email_count": len(system.inbox.messages()),
         "alerts": system.alerts.recent()[:RECENT_ALERTS],
         "protocols": system.state.protocol_totals(),
         "per_sensor": system.state.counts(),
@@ -276,7 +304,15 @@ def register_service_api(app: Flask, system: SocSystem) -> None:
 
     @app.get("/api/diagnostics")
     def get_diagnostics() -> ResponseReturnValue:
-        commands = [{"id": key, "label": spec.label} for key, spec in COMMANDS.items()]
+        commands = [
+            {
+                "id": key,
+                "label": spec.label,
+                "summary": spec.summary,
+                "needs_target": spec.needs_target,
+            }
+            for key, spec in COMMANDS.items()
+        ]
         return ok({"commands": commands, "targets": allowed_targets(system.config)})
 
     @app.post("/api/diagnostics")
@@ -298,11 +334,13 @@ def create_app(system: SocSystem) -> Flask:
     @app.get("/")
     def index() -> str:
         """Serve the single-page dashboard."""
+        ftp = system.config["services"]["ftp"]
         return render_template(
             "index.html",
             sensors=system.sensor_ids,
             methods=FRAMING_METHODS,
             crc_types=list(CRC_POLYNOMIALS),
+            ftp_address=f"{ftp['host']}:{ftp['port']}",
         )
 
     register_api(app, system)

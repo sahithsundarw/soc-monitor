@@ -13,9 +13,9 @@ from collections import defaultdict, deque
 from collections.abc import Callable
 from typing import Any
 
-logger = logging.getLogger("soc.qos")
+from soc.state import PerSecondTimeline
 
-TIMELINE_SECONDS = 60
+logger = logging.getLogger("soc.qos")
 
 FloodCallback = Callable[[str, int], None]
 
@@ -64,7 +64,7 @@ class TrafficPolicer:
         self._totals = {
             sensor: {"allowed": 0, "dropped": 0} for sensor in self._buckets
         }
-        self._timeline: dict[int, dict[str, int]] = {}
+        self._timeline = PerSecondTimeline(("allowed", "dropped"))
 
     def allow(self, sensor: str, now: float | None = None) -> bool:
         """Police one frame from ``sensor``; False means it is dropped."""
@@ -79,9 +79,7 @@ class TrafficPolicer:
             allowed = bucket.allow(now)
             outcome = "allowed" if allowed else "dropped"
             self._totals[sensor][outcome] += 1
-            second = self._timeline.setdefault(int(now), {"allowed": 0, "dropped": 0})
-            second[outcome] += 1
-            self._forget_old_seconds(int(now))
+            self._timeline.add(outcome, now=now)
             drops = 0 if allowed else self._count_drop(sensor, now)
         if drops >= self._flood_threshold:
             self._on_flood(sensor, drops)
@@ -95,11 +93,6 @@ class TrafficPolicer:
             times.popleft()
         return len(times)
 
-    def _forget_old_seconds(self, current: int) -> None:
-        """Keep only the last TIMELINE_SECONDS seconds of the timeline."""
-        for second in [s for s in self._timeline if s <= current - TIMELINE_SECONDS]:
-            del self._timeline[second]
-
     def totals(self) -> dict[str, dict[str, int]]:
         """Allowed and dropped frames per sensor since start-up."""
         with self._lock:
@@ -107,12 +100,4 @@ class TrafficPolicer:
 
     def timeline(self, now: float | None = None) -> list[dict[str, int]]:
         """Allowed vs dropped for each of the last 60 seconds (oldest first)."""
-        current = int(time.time() if now is None else now)
-        with self._lock:
-            return [
-                {
-                    "t": second,
-                    **self._timeline.get(second, {"allowed": 0, "dropped": 0}),
-                }
-                for second in range(current - TIMELINE_SECONDS + 1, current + 1)
-            ]
+        return self._timeline.window(now)

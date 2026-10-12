@@ -10,6 +10,7 @@ services (FTP, SMTP, dashboard) run on the PC that hosts the SOC.
 """
 
 import logging
+import time
 from pathlib import Path
 from typing import Any
 
@@ -96,8 +97,10 @@ class SocSystem:
         self.mail_server = MailServer(services["smtp"], self.inbox)
         self.mailer = AlertMailer(services["smtp"])
         self.alerts.subscribe(self.mailer.on_alert)
+        self.alerts.subscribe(lambda _alert: self.state.mark("alerts"))
         self.ftp_server = FtpArchiveServer(services["ftp"])
         self.running = False
+        self.started_at: float | None = None
         self._services_started = False
 
     @property
@@ -120,6 +123,7 @@ class SocSystem:
         for node in self.local_nodes():
             node.start()
         self.running = True
+        self.started_at = time.time()
         logger.info("SOC system started with nodes %s", sorted(self.local_ids))
 
     def stop(self) -> None:

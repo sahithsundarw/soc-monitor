@@ -65,6 +65,13 @@ class StatusApiTest(DashboardTestCase):
             {"events", "alerts", "corrupted", "retransmissions", "firewall_blocks"},
         )
         self.assertEqual(len(data["qos"]["timeline"]), 60)
+        self.assertEqual(set(data["trends"]), set(data["tiles"]))
+        self.assertTrue(all(len(series) == 60 for series in data["trends"].values()))
+        self.assertEqual(
+            set(data["severity_counts"]), {"LOW", "MEDIUM", "HIGH", "CRITICAL"}
+        )
+        self.assertIsNone(data["uptime_s"])  # the test system is never started
+        self.assertEqual(data["email_count"], 0)
         self.assertEqual(data["routes"]["S1"]["path"], ["S1", "R2", "SOC"])
 
     def test_topology_has_tables_for_every_router(self) -> None:
