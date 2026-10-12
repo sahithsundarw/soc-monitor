@@ -3,6 +3,10 @@
 Concept: putting the layers together. One topology and one set of link settings are
 shared by all nodes, so a link failure or a switch of framing method affects the
 whole simulated network at once.
+
+Only nodes whose ``host_ip`` belongs to this PC are started, so the same config.json
+runs on one PC (everything on 127.0.0.1) or is split across two lab PCs. The
+services (FTP, SMTP, dashboard) run on the PC that hosts the SOC.
 """
 
 import logging
@@ -14,6 +18,7 @@ from datalink.frame import FrameFormat, LinkSettings
 from network.router import Router
 from network.routing import shortest_path
 from network.topology import Topology
+from network.transport import is_local_address
 from services.ftp_archive import FtpArchiveServer
 from services.mailer import AlertMailer, Inbox, MailServer
 from soc.collector import Collector
@@ -59,23 +64,32 @@ class SocSystem:
                 sensor, drops, flood_window
             ),
         )
-        self.collector = Collector(
-            self.collector_id,
-            config,
-            self.topology,
-            self.settings,
-            self.state,
-            self.firewall,
-            self.policer,
-            self.detector,
-        )
+        self.local_ids = {
+            node_id
+            for node_id, node in nodes.items()
+            if is_local_address(node["host_ip"])
+        }
+        self.collector: Collector | None = None
+        if self.collector_id in self.local_ids:
+            self.collector = Collector(
+                self.collector_id,
+                config,
+                self.topology,
+                self.settings,
+                self.state,
+                self.firewall,
+                self.policer,
+                self.detector,
+            )
         self.routers = {
             rid: Router(rid, config, self.topology, self.settings)
             for rid in self.router_ids
+            if rid in self.local_ids
         }
         self.sensors = {
             sid: Sensor(sid, config, self.topology, self.settings, self.state)
             for sid in self.sensor_ids
+            if sid in self.local_ids
         }
         services = config["services"]
         self.inbox = Inbox()
@@ -86,28 +100,33 @@ class SocSystem:
         self.running = False
         self._services_started = False
 
+    @property
+    def hosts_soc(self) -> bool:
+        """True if the SOC collector (and so the services) runs on this PC."""
+        return self.collector is not None
+
+    def local_nodes(self) -> list[Any]:
+        """Nodes started on this PC: collector, routers, then sensors."""
+        nodes: list[Any] = [self.collector] if self.collector is not None else []
+        return [*nodes, *self.routers.values(), *self.sensors.values()]
+
     def start(self) -> None:
         """Start the services, then the collector, routers and finally sensors."""
-        self.mail_server.start()
-        self.mailer.start()
-        self.ftp_server.start()
-        self._services_started = True
-        self.collector.start()
-        for router in self.routers.values():
-            router.start()
-        for sensor in self.sensors.values():
-            sensor.start()
+        if self.hosts_soc:
+            self.mail_server.start()
+            self.mailer.start()
+            self.ftp_server.start()
+            self._services_started = True
+        for node in self.local_nodes():
+            node.start()
         self.running = True
-        logger.info("SOC system started")
+        logger.info("SOC system started with nodes %s", sorted(self.local_ids))
 
     def stop(self) -> None:
         """Stop in reverse order so no node sends to one that is already gone."""
         self.running = False
-        for sensor in self.sensors.values():
-            sensor.stop()
-        for router in self.routers.values():
-            router.stop()
-        self.collector.stop()
+        for node in reversed(self.local_nodes()):
+            node.stop()
         if self._services_started:
             self.mailer.stop()
             self.mail_server.stop()
@@ -123,13 +142,19 @@ class SocSystem:
         return result
 
     def services(self) -> list[tuple[str, str, int]]:
-        """(name, host, port) for every service and node, for the startup banner."""
-        services = self.config["services"]
-        rows: list[tuple[str, str, int]] = [
-            ("FTP archive", services["ftp"]["host"], services["ftp"]["port"]),
-            ("SMTP mail server", services["smtp"]["host"], services["smtp"]["port"]),
-        ]
+        """(name, host, port) for every service and node on this PC, for the banner."""
+        rows: list[tuple[str, str, int]] = []
+        if self.hosts_soc:
+            services = self.config["services"]
+            rows.append(
+                ("FTP archive", services["ftp"]["host"], services["ftp"]["port"])
+            )
+            rows.append(
+                ("SMTP mail server", services["smtp"]["host"], services["smtp"]["port"])
+            )
         for node_id in [self.collector_id, *self.router_ids, *self.sensor_ids]:
+            if node_id not in self.local_ids:
+                continue
             node = self.config["nodes"][node_id]
             label = f"{node_id} {node['role']}"
             if node["role"] == "sensor":

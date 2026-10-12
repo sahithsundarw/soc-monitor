@@ -8,6 +8,7 @@ Run with: python run_demo.py [--noise 0.1] [--verbose]
 
 import argparse
 import logging
+import signal
 import time
 from pathlib import Path
 
@@ -33,16 +34,22 @@ def setup_logging(verbose: bool, log_file: Path = LOG_FILE) -> None:
     logging.basicConfig(level=logging.INFO, handlers=[file_handler, console])
 
 
-def print_banner(system: SocSystem, dashboard: tuple[str, int]) -> None:
+def print_banner(system: SocSystem, dashboard: tuple[str, int] | None) -> None:
     """Short banner, one aligned line per service, then the current routes."""
     print("SOC Monitor  -  secure framing and auto-rerouting")
     print("-" * 52)
-    for name, host, port in [("Dashboard (HTTP)", *dashboard), *system.services()]:
+    rows = system.services()
+    if dashboard is not None:
+        rows.insert(0, ("Dashboard (HTTP)", *dashboard))
+    for name, host, port in rows:
         print(f"  {name:<26} {host:>15}:{port}")
     print("-" * 52)
     for sensor_id, route in system.routes().items():
         print(f"  route {sensor_id:<4} {format_route(route['path'], route['cost'])}")
-    print(f"Open http://{dashboard[0]}:{dashboard[1]}  -  press Ctrl+C to stop.")
+    if dashboard is not None:
+        print(f"Open http://{dashboard[0]}:{dashboard[1]}  -  press Ctrl+C to stop.")
+    else:
+        print("The SOC runs on the other PC; open its dashboard. Ctrl+C to stop.")
 
 
 def parse_args() -> argparse.Namespace:
@@ -57,25 +64,44 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def stop_on_signal(signum: int, frame: object) -> None:
+    """Treat SIGTERM (and Ctrl+Break on Windows) like Ctrl+C."""
+    raise KeyboardInterrupt
+
+
+def install_signal_handlers() -> None:
+    """Make every usual way of stopping the program shut down cleanly."""
+    signal.signal(signal.SIGTERM, stop_on_signal)
+    if hasattr(signal, "SIGBREAK"):  # Windows only
+        signal.signal(signal.SIGBREAK, stop_on_signal)
+
+
 def main() -> None:
     """Build, start, wait for Ctrl+C, stop."""
     args = parse_args()
     setup_logging(args.verbose)
+    install_signal_handlers()
     system = SocSystem(load_config())
     if args.noise is not None:
         system.settings.set_error_rate(args.noise)
-    web = system.config["services"]["dashboard"]
-    dashboard = DashboardServer(create_app(system), web["host"], web["port"])
+    dashboard: DashboardServer | None = None
+    address: tuple[str, int] | None = None
+    if system.hosts_soc:
+        web = system.config["services"]["dashboard"]
+        address = (web["host"], web["port"])
+        dashboard = DashboardServer(create_app(system), *address)
     system.start()
-    dashboard.start()
-    print_banner(system, (web["host"], web["port"]))
+    if dashboard is not None:
+        dashboard.start()
+    print_banner(system, address)
     try:
         while True:
             time.sleep(1)  # sleep (unlike a bare wait) is interruptible on Windows
     except KeyboardInterrupt:
         print("\nShutting down ...")
     finally:
-        dashboard.stop()
+        if dashboard is not None:
+            dashboard.stop()
         system.stop()
         print("All services stopped.")
 

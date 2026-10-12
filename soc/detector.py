@@ -216,7 +216,7 @@ class Detector:
             times.popleft()
         if len(times) < needed:
             return None
-        gaps = [later - earlier for earlier, later in zip(times, list(times)[1:])]
+        gaps = [times[i + 1] - times[i] for i in range(len(times) - 1)]
         if max(gaps) - min(gaps) > self.rules["beacon_jitter_s"]:
             return None  # irregular timing: probably normal traffic
         return (

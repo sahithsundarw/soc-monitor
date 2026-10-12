@@ -74,7 +74,7 @@ class FrameServer:
         while not self._stop.is_set():
             try:
                 data, _ = self._udp.recvfrom(MAX_DATAGRAM)
-            except socket.timeout:
+            except TimeoutError:
                 continue
             except ConnectionResetError:
                 # Windows reports an earlier datagram to a closed port this way.
@@ -88,7 +88,7 @@ class FrameServer:
         while not self._stop.is_set():
             try:
                 connection, _ = self._tcp.accept()
-            except socket.timeout:
+            except TimeoutError:
                 continue
             except OSError:
                 break
@@ -111,6 +111,16 @@ class FrameServer:
                 return
         if chunks:
             self._deliver(b"".join(chunks), "tcp")
+
+
+def is_local_address(ip: str) -> bool:
+    """True if this PC owns ``ip``: binding a socket to it only works locally."""
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+        try:
+            probe.bind((ip, 0))
+        except OSError:
+            return False
+    return True
 
 
 def send_tcp(data: bytes, address: Address) -> None:

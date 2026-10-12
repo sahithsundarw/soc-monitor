@@ -157,8 +157,10 @@ def find_event(system: SocSystem, event_id: str) -> dict[str, Any]:
 
 def require_sensor(system: SocSystem, sensor_id: Any) -> str:
     """Validate a sensor id from a request."""
-    if sensor_id not in system.sensors:
+    if sensor_id not in system.sensor_ids:
         raise ApiError(f"Unknown sensor {sensor_id!r}")
+    if sensor_id not in system.sensors:
+        raise ApiError(f"Sensor {sensor_id} runs on the other PC; start it from there")
     return sensor_id
 
 

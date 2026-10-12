@@ -132,3 +132,33 @@ class NetworkTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TwoPcSplitTest(unittest.TestCase):
+    """Only nodes whose host_ip belongs to this PC are created."""
+
+    def test_remote_nodes_are_skipped(self) -> None:
+        config = make_test_config(33000)
+        remote_ip = "192.0.2.1"  # TEST-NET-1: never assigned to a real PC
+        for node_id in ("S1", "S2", "S3"):
+            config["nodes"][node_id]["host_ip"] = remote_ip
+        system = SocSystem(config, alerts_file=None)
+        try:
+            self.assertEqual(system.sensors, {})
+            self.assertTrue(system.hosts_soc)
+            self.assertEqual(set(system.routers), {"R1", "R2", "R3", "R4"})
+            self.assertEqual(system.sensor_ids, ["S1", "S2", "S3"])
+        finally:
+            system.stop()
+
+    def test_sensor_pc_does_not_host_services(self) -> None:
+        config = make_test_config(33000)
+        for node_id in ("SOC", "R1", "R2", "R3", "R4"):
+            config["nodes"][node_id]["host_ip"] = "192.0.2.1"
+        system = SocSystem(config, alerts_file=None)
+        try:
+            self.assertFalse(system.hosts_soc)
+            self.assertEqual(set(system.sensors), {"S1", "S2", "S3"})
+            self.assertEqual(system.services()[0][0], "S1 sensor (fw01)")
+        finally:
+            system.stop()
