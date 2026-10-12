@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+
+logs/*
+reports/*
+ftp_root/*
+!logs/.gitkeep
+!reports/.gitkeep
+!ftp_root/.gitkeep
