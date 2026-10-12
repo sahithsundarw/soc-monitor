@@ -325,7 +325,7 @@ function initAlertFilter() {
 function chartGeometry(canvas, count) {
   const width = canvas.clientWidth;
   const height = canvas.clientHeight;
-  const left = 32;
+  const left = 36;
   const bottom = height - 22;
   return { width, height, left, bottom, plotHeight: bottom - 8, slot: (width - left) / count };
 }
@@ -369,8 +369,8 @@ function drawQosChart(timeline) {
   ctx.clearRect(0, 0, geo.width, geo.height);
 
   const top = niceTop(Math.max(0, ...timeline.map((s) => s.allowed + s.dropped)));
-  const muted = cssVar("--text-faint");
-  ctx.font = `12px ${cssVar("--font-ui")}`;
+  const muted = cssVar("--text-muted");
+  ctx.font = `13px ${cssVar("--font-ui")}`;
   ctx.lineWidth = 1;
   for (const fraction of [0, 0.5, 1]) {
     const y = Math.round(geo.bottom - geo.plotHeight * fraction) + 0.5;
@@ -573,11 +573,11 @@ function drawTopology(topology) {
     const classes = ["topo-node", `role-${node.role}`];
     if (route.path.includes(node.id)) classes.push("is-route");
     const group = svg("g", { class: classes.join(" "), transform: `translate(${node.x} ${node.y})` });
-    group.appendChild(svg("rect", { x: -60, y: -24, width: 120, height: 48, rx: 8 }));
-    const glyph = svg("use", { href: `#i-${NODE_GLYPHS[node.role]}`, x: -50, y: -10, width: 20, height: 20, class: "node-glyph" });
-    const label = svg("text", { x: -24, y: -3, class: "node-id" });
+    group.appendChild(svg("rect", { x: -66, y: -25, width: 132, height: 50, rx: 8 }));
+    const glyph = svg("use", { href: `#i-${NODE_GLYPHS[node.role]}`, x: -56, y: -10, width: 20, height: 20, class: "node-glyph" });
+    const label = svg("text", { x: -28, y: -3, class: "node-id" });
     label.textContent = node.role === "sensor" ? `${node.id} ${node.name}` : node.id;
-    const ip = svg("text", { x: -24, y: 13, class: "node-ip" });
+    const ip = svg("text", { x: -28, y: 14, class: "node-ip" });
     ip.textContent = node.sim_ip;
     group.append(glyph, label, ip);
     canvas.appendChild(group);

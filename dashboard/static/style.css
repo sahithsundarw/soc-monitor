@@ -11,7 +11,7 @@
   --border-strong: #cfd5de;
   --text: #161d29;
   --text-muted: #566172;
-  --text-faint: #7a8494;
+  --text-faint: #636d7d; /* >= 4.6:1 on every light surface */
   --accent: #2357d4;
   --accent-hover: #1d4bb8;
   --accent-soft: #e9effc;
@@ -44,7 +44,7 @@
   --border-strong: #354050;
   --text: #e6eaf0;
   --text-muted: #9ba6b5;
-  --text-faint: #7d8898;
+  --text-faint: #8590a1; /* >= 4.5:1 on every dark surface */
   --accent: #5b8cff;
   --accent-hover: #7aa2ff;
   --accent-soft: #1c2840;
@@ -165,7 +165,7 @@ input {
 
 .brand-sub {
   color: var(--text-faint);
-  font-size: 12.5px;
+  font-size: 14px;
 }
 
 .nav {
@@ -178,7 +178,7 @@ input {
   margin: 16px 0 4px;
   padding: 0 12px;
   color: var(--text-faint);
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 500;
 }
 
@@ -242,7 +242,7 @@ input {
   border: 1px solid var(--border);
   border-radius: var(--radius-control);
   background: var(--surface-muted);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .link-info div {
@@ -310,7 +310,7 @@ input {
   align-items: center;
   gap: 16px;
   color: var(--text-muted);
-  font-size: 13.5px;
+  font-size: 14px;
   white-space: nowrap;
 }
 
@@ -431,7 +431,7 @@ input {
 
 .card-meta {
   color: var(--text-faint);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .card-actions {
@@ -508,7 +508,7 @@ input {
 
 .tile-label {
   color: var(--text-muted);
-  font-size: 13.5px;
+  font-size: 14px;
 }
 
 .tile-value {
@@ -531,7 +531,7 @@ input {
   overflow: hidden;
   text-overflow: ellipsis;
   color: var(--text-faint);
-  font-size: 13px;
+  font-size: 14px;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
@@ -595,7 +595,7 @@ input {
   border-radius: 999px;
   background: var(--surface);
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 14px;
   cursor: pointer;
 }
 
@@ -697,7 +697,7 @@ input {
 
 .alert-time {
   color: var(--text-faint);
-  font-size: 13px;
+  font-size: 14px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -747,7 +747,7 @@ input {
   border-radius: var(--radius-control);
   background: var(--surface);
   box-shadow: var(--shadow-raised);
-  font-size: 13px;
+  font-size: 14px;
   pointer-events: none;
 }
 
@@ -778,7 +778,7 @@ input {
   gap: 8px 24px;
   margin-top: 12px;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .swatch {
@@ -833,7 +833,7 @@ input {
 
 .split-count {
   color: var(--text-faint);
-  font-size: 13px;
+  font-size: 14px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -872,7 +872,7 @@ input {
   padding: 8px 12px;
   text-align: left;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
@@ -956,9 +956,10 @@ input {
   50% { stroke-opacity: 0.45; }
 }
 
+/* SVG text sizes are viewBox units: the diagram renders ~1.4x larger at 1440px. */
 .topo-cost {
   fill: var(--text-muted);
-  font-size: 12px;
+  font-size: 13px;
   text-anchor: middle;
 }
 
@@ -995,14 +996,14 @@ input {
 
 .topo-node .node-id {
   fill: var(--text);
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 650;
 }
 
 .topo-node .node-ip {
   fill: var(--text-muted);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .topo-foot {
@@ -1031,7 +1032,7 @@ input {
   flex-wrap: wrap;
   gap: 8px 20px;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .topo-legend li {
@@ -1105,14 +1106,14 @@ input {
 
 .btn-small {
   padding: 3px 10px;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .btn-icon {
   padding: 4px 8px;
   border-color: var(--border);
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .segmented {
@@ -1155,7 +1156,7 @@ input {
 
 .field-label {
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
 }
 
@@ -1191,7 +1192,7 @@ input {
   justify-content: space-between;
   margin-right: 64px;
   color: var(--text-faint);
-  font-size: 12.5px;
+  font-size: 14px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1220,7 +1221,7 @@ input {
 .action-desc {
   display: block;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .command-list {
@@ -1296,7 +1297,7 @@ input {
 
 .event-meta {
   color: var(--text-faint);
-  font-size: 13px;
+  font-size: 14px;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
@@ -1348,7 +1349,7 @@ input {
 
 .layer-concept {
   color: var(--text-faint);
-  font-size: 13px;
+  font-size: 14px;
   text-align: right;
 }
 
@@ -1371,7 +1372,7 @@ input {
 
 .kv-compact {
   gap: 4px 16px;
-  font-size: 13.5px;
+  font-size: 14px;
 }
 
 .code {
@@ -1383,7 +1384,7 @@ input {
   background: var(--surface-sunken);
   border: 1px solid var(--border);
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.6;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -1434,7 +1435,7 @@ input {
 
 .mail-time {
   color: var(--text-faint);
-  font-size: 13px;
+  font-size: 14px;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
@@ -1442,7 +1443,7 @@ input {
 .mail-from {
   display: block;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .mail-meta {
@@ -1455,7 +1456,7 @@ input {
 .mail-body {
   margin: 0;
   font-family: var(--font-mono);
-  font-size: 13.5px;
+  font-size: 14px;
   line-height: 1.7;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -1474,7 +1475,7 @@ input {
   background: #0d1117;
   color: #d5dde8;
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.6;
   white-space: pre-wrap;
 }
