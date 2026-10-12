@@ -5,6 +5,7 @@ once a second (no websockets) and sends control actions with POST. Every JSON
 response has the same shape: {"data": ..., "error": null | "message"}.
 """
 
+import ftplib
 import logging
 import threading
 from typing import Any
@@ -17,6 +18,13 @@ from dashboard.inspector import describe_layers
 from datalink.crc import CRC_POLYNOMIALS
 from datalink.framing import FRAMING_METHODS
 from network.routing import build_forwarding_table
+from services.diagnostics import (
+    COMMANDS,
+    DiagnosticsError,
+    allowed_targets,
+    run_diagnostic,
+)
+from services.ftp_archive import generate_and_upload, list_files
 from soc.sensor import ATTACKS
 from soc.system import SocSystem
 
@@ -237,6 +245,48 @@ def register_api(app: Flask, system: SocSystem) -> None:
             daemon=True,
         ).start()
         return ok({"sensor": sensor.node_id, "frames": count, "spoofed": spoof})
+
+    register_service_api(app, system)
+
+
+def register_service_api(app: Flask, system: SocSystem) -> None:
+    """Add the FTP report, email inbox and diagnostics endpoints."""
+    ftp_config = system.config["services"]["ftp"]
+
+    @app.get("/api/reports")
+    def get_reports() -> ResponseReturnValue:
+        try:
+            return ok(list_files(ftp_config))
+        except (OSError, EOFError, ftplib.Error) as error:
+            return fail(f"FTP server not reachable: {error}", 503)
+
+    @app.post("/api/reports")
+    def make_report() -> ResponseReturnValue:
+        try:
+            uploaded = generate_and_upload(ftp_config, system.alerts_file)
+        except (OSError, EOFError, ftplib.Error) as error:
+            return fail(f"Upload failed: {error}", 503)
+        return ok({"uploaded": uploaded})
+
+    @app.get("/api/emails")
+    def get_emails() -> ResponseReturnValue:
+        return ok(system.inbox.messages())
+
+    @app.get("/api/diagnostics")
+    def get_diagnostics() -> ResponseReturnValue:
+        commands = [{"id": key, "label": spec.label} for key, spec in COMMANDS.items()]
+        return ok({"commands": commands, "targets": allowed_targets(system.config)})
+
+    @app.post("/api/diagnostics")
+    def post_diagnostics() -> ResponseReturnValue:
+        data = body()
+        try:
+            result = run_diagnostic(
+                str(data.get("command")), str(data.get("target")), system.config
+            )
+        except DiagnosticsError as error:
+            raise ApiError(str(error)) from error
+        return ok(result)
 
 
 def create_app(system: SocSystem) -> Flask:

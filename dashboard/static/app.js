@@ -159,7 +159,9 @@ function renderTopbar(status) {
   pill.dataset.state = status.running ? "running" : "stopped";
   pill.textContent = status.running ? "Running" : "Stopped";
   $("top-events").textContent = formatNumber(status.tiles.events);
+  $("top-events-label").textContent = status.tiles.events === 1 ? "event" : "events";
   $("top-alerts").textContent = formatNumber(status.tiles.alerts);
+  $("top-alerts-label").textContent = status.tiles.alerts === 1 ? "alert" : "alerts";
   const route = status.routes.S1;
   $("top-route").textContent = route && route.path.length ? route.path.join(" > ") : "no route";
 }

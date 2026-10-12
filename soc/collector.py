@@ -91,7 +91,12 @@ class Collector(Node):
         sender = header.src_id if header else UNKNOWN_SENDER
         self.state.count(sender, protocol, "corrupted")
         self.detector.record_crc_failure(self.arrival_link(sender))
-        if header is None or header.frame_type != "DATA":
+        # The damage may have hit the header itself, so only NAK a sender we know.
+        if (
+            header is None
+            or header.frame_type != "DATA"
+            or header.src_id not in self.sensor_ids
+        ):
             logger.warning(
                 "Integrity alert: CRC failed, sender unknown, no NAK possible"
             )

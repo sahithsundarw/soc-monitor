@@ -132,6 +132,36 @@ class ControlApiTest(DashboardTestCase):
         self.assertIn("JSON object", body["error"])
 
 
+class ServiceApiTest(DashboardTestCase):
+    """Reports, emails and diagnostics endpoints (services not started)."""
+
+    def test_reports_without_ftp_server_is_503(self) -> None:
+        response = self.client.get("/api/reports")
+        self.assertEqual(response.status_code, 503)
+        self.assertIn("FTP", response.get_json()["error"])
+
+    def test_inbox_starts_empty(self) -> None:
+        self.assertEqual(self.get_data("/api/emails"), [])
+
+    def test_diagnostics_lists_whitelist_and_targets(self) -> None:
+        data = self.get_data("/api/diagnostics")
+        self.assertEqual(
+            [c["id"] for c in data["commands"]],
+            ["ping", "traceroute", "netstat", "ipconfig", "arp"],
+        )
+        self.assertEqual(data["targets"][0]["ip"], "127.0.0.1")
+
+    def test_diagnostics_rejects_unlisted_command_and_target(self) -> None:
+        status, _ = self.post(
+            "/api/diagnostics", {"command": "rm", "target": "127.0.0.1"}
+        )
+        self.assertEqual(status, 400)
+        status, _ = self.post(
+            "/api/diagnostics", {"command": "ping", "target": "8.8.8.8"}
+        )
+        self.assertEqual(status, 400)
+
+
 class InspectorTest(unittest.TestCase):
     """Layer breakdown of a received event."""
 

@@ -14,6 +14,8 @@ from datalink.frame import FrameFormat, LinkSettings
 from network.router import Router
 from network.routing import shortest_path
 from network.topology import Topology
+from services.ftp_archive import FtpArchiveServer
+from services.mailer import AlertMailer, Inbox, MailServer
 from soc.collector import Collector
 from soc.detector import AlertStore, Detector
 from soc.firewall import Firewall
@@ -46,6 +48,7 @@ class SocSystem:
             n for n, v in nodes.items() if v["role"] == "collector"
         )
         self.state = SocState(self.sensor_ids)
+        self.alerts_file = alerts_file
         self.alerts = AlertStore(alerts_file)
         self.detector = Detector(config, self.alerts.add)
         self.firewall = Firewall(config["firewall"])
@@ -74,10 +77,21 @@ class SocSystem:
             sid: Sensor(sid, config, self.topology, self.settings, self.state)
             for sid in self.sensor_ids
         }
+        services = config["services"]
+        self.inbox = Inbox()
+        self.mail_server = MailServer(services["smtp"], self.inbox)
+        self.mailer = AlertMailer(services["smtp"])
+        self.alerts.subscribe(self.mailer.on_alert)
+        self.ftp_server = FtpArchiveServer(services["ftp"])
         self.running = False
+        self._services_started = False
 
     def start(self) -> None:
-        """Start the collector first, then routers, then sensors."""
+        """Start the services, then the collector, routers and finally sensors."""
+        self.mail_server.start()
+        self.mailer.start()
+        self.ftp_server.start()
+        self._services_started = True
         self.collector.start()
         for router in self.routers.values():
             router.start()
@@ -94,6 +108,10 @@ class SocSystem:
         for router in self.routers.values():
             router.stop()
         self.collector.stop()
+        if self._services_started:
+            self.mailer.stop()
+            self.mail_server.stop()
+            self.ftp_server.stop()
         logger.info("SOC system stopped")
 
     def routes(self) -> dict[str, dict[str, Any]]:
@@ -105,8 +123,12 @@ class SocSystem:
         return result
 
     def services(self) -> list[tuple[str, str, int]]:
-        """(name, host, port) for every node, for the startup banner."""
-        rows: list[tuple[str, str, int]] = []
+        """(name, host, port) for every service and node, for the startup banner."""
+        services = self.config["services"]
+        rows: list[tuple[str, str, int]] = [
+            ("FTP archive", services["ftp"]["host"], services["ftp"]["port"]),
+            ("SMTP mail server", services["smtp"]["host"], services["smtp"]["port"]),
+        ]
         for node_id in [self.collector_id, *self.router_ids, *self.sensor_ids]:
             node = self.config["nodes"][node_id]
             label = f"{node_id} {node['role']}"
