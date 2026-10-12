@@ -113,8 +113,8 @@ class PolicerTest(unittest.TestCase):
             self.policer.allow("S1", now=1.0)
         self.assertTrue(self.policer.allow("S2", now=1.0))
 
-    def test_unpoliced_sender_is_allowed(self) -> None:
-        self.assertTrue(self.policer.allow("EXT", now=1.0))
+    def test_unknown_sender_is_dropped(self) -> None:
+        self.assertFalse(self.policer.allow("EXT", now=1.0))
 
     def test_timeline_has_sixty_seconds(self) -> None:
         self.policer.allow("S1", now=100.2)

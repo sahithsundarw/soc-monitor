@@ -130,18 +130,23 @@ class Detector:
         self._sink(Alert(round(now, 3), severity, rule, title, detail, source))
         return True
 
-    def process_event(self, event: dict[str, Any]) -> None:
-        """Run every event-based rule on one received event."""
+    def process_event(self, event: dict[str, Any], now: float | None = None) -> None:
+        """Run every event-based rule on one received event.
+
+        Time windows use the collector's receive time ``now``, never the event's own
+        "ts" field: a sender could forge that field to dodge the windows.
+        """
+        now = time.time() if now is None else now
         with self._lock:
             checks = [
                 self._check_unknown_host(event),
-                self._check_brute_force(event),
-                self._check_port_scan(event),
-                self._check_beacon(event),
+                self._check_brute_force(event, now),
+                self._check_port_scan(event, now),
+                self._check_beacon(event, now),
             ]
         for found in checks:
             if found is not None:
-                self.raise_alert(*found, now=event["ts"])
+                self.raise_alert(*found, now=now)
 
     def _check_unknown_host(self, event: dict[str, Any]) -> tuple[str, ...] | None:
         """An event from an IP that is not listed in config.json."""
@@ -156,12 +161,14 @@ class Detector:
             f"Event from {src_ip}, which is not a known host (seen by {event['sensor']})",
         )
 
-    def _check_brute_force(self, event: dict[str, Any]) -> tuple[str, ...] | None:
+    def _check_brute_force(
+        self, event: dict[str, Any], now: float
+    ) -> tuple[str, ...] | None:
         """N or more failed logins from one IP inside the window."""
         if event["type"] != "failed_login":
             return None
         src_ip = event["src_ip"]
-        count = self._failed_logins.add(src_ip, event["ts"])
+        count = self._failed_logins.add(src_ip, now)
         if count < self.rules["brute_force_attempts"]:
             return None
         return (
@@ -173,11 +180,13 @@ class Detector:
             f"within {self.rules['brute_force_window_s']} s",
         )
 
-    def _check_port_scan(self, event: dict[str, Any]) -> tuple[str, ...] | None:
+    def _check_port_scan(
+        self, event: dict[str, Any], now: float
+    ) -> tuple[str, ...] | None:
         """N or more distinct destination ports from one IP inside the window."""
         if event["type"] != "port_probe":
             return None
-        src_ip, now = event["src_ip"], event["ts"]
+        src_ip = event["src_ip"]
         probes = self._ports[src_ip]
         probes.append((now, event["dst_port"]))
         while probes and probes[0][0] < now - self.rules["port_scan_window_s"]:
@@ -193,13 +202,15 @@ class Detector:
             f"{src_ip} probed {distinct} ports within {self.rules['port_scan_window_s']} s",
         )
 
-    def _check_beacon(self, event: dict[str, Any]) -> tuple[str, ...] | None:
+    def _check_beacon(
+        self, event: dict[str, Any], now: float
+    ) -> tuple[str, ...] | None:
         """Beacons from one host to one destination at a near-constant interval."""
         if event["type"] != "beacon":
             return None
         pair = f"{event['src_ip']}->{event['dst_ip']}"
         times = self._beacons[pair]
-        times.append(event["ts"])
+        times.append(now)
         needed = self.rules["beacon_min_count"]
         while len(times) > needed:
             times.popleft()

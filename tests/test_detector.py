@@ -35,44 +35,57 @@ class DetectorTest(unittest.TestCase):
     def test_brute_force_after_five_failures(self) -> None:
         for second in range(4):
             self.detector.process_event(
-                event("failed_login", 100 + second, user="root")
+                event("failed_login", 100 + second, user="root"), now=100 + second
             )
         self.assertEqual(self.rules(), [])
-        self.detector.process_event(event("failed_login", 105, user="root"))
+        self.detector.process_event(event("failed_login", 105, user="root"), now=105)
         self.assertEqual(self.rules(), ["brute_force"])
         self.assertEqual(self.alerts[0].severity, "HIGH")
 
     def test_failures_outside_window_do_not_count(self) -> None:
         for minute in range(6):
-            self.detector.process_event(event("failed_login", 100 + minute * 61))
+            self.detector.process_event(
+                event("failed_login", 100 + minute * 61), now=100 + minute * 61
+            )
         self.assertEqual(self.rules(), [])
 
     def test_port_scan_needs_ten_distinct_ports(self) -> None:
         for _ in range(12):
-            self.detector.process_event(event("port_probe", 100.0, dst_port=22))
+            self.detector.process_event(
+                event("port_probe", 100.0, dst_port=22), now=100.0
+            )
         self.assertEqual(self.rules(), [])
         for port in range(10):
             self.detector.process_event(
-                event("port_probe", 100.1, dst_port=1000 + port)
+                event("port_probe", 100.1, dst_port=1000 + port), now=100.1
             )
         self.assertEqual(self.rules(), ["port_scan"])
 
+    def test_forged_future_timestamp_does_not_suppress_alerts(self) -> None:
+        # A forged far-future "ts" must not start a cooldown that never ends.
+        forged = event("http_request", 9e12, src_ip="8.8.4.4")
+        self.detector.process_event(forged, now=100)
+        self.detector.process_event(forged, now=100 + ALERT_COOLDOWN_S + 1)
+        self.assertEqual(self.rules(), ["unknown_host", "unknown_host"])
+
     def test_unknown_host(self) -> None:
-        self.detector.process_event(event("http_request", 100, src_ip="8.8.4.4"))
+        self.detector.process_event(
+            event("http_request", 100, src_ip="8.8.4.4"), now=100
+        )
         self.assertEqual(self.rules(), ["unknown_host"])
         self.assertEqual(self.alerts[0].severity, "MEDIUM")
 
     def test_regular_beacons_are_c2(self) -> None:
         for n in range(4):
             self.detector.process_event(
-                event("beacon", 100 + n * 2.0, dst_ip="9.9.9.9")
+                event("beacon", 100 + n * 2.0, dst_ip="9.9.9.9"), now=100 + n * 2.0
             )
         self.assertIn("malware_c2", self.rules())
         self.assertEqual(self.alerts[-1].severity, "CRITICAL")
 
     def test_irregular_beacons_are_ignored(self) -> None:
         for ts in (100, 101, 105, 106):
-            self.detector.process_event(event("beacon", ts, dst_ip="9.9.9.9"))
+            self.detector.process_event(event("beacon", ts, dst_ip="9.9.9.9"), now=ts)
         self.assertNotIn("malware_c2", self.rules())
 
     def test_crc_failures_on_one_link(self) -> None:
@@ -83,9 +96,11 @@ class DetectorTest(unittest.TestCase):
 
     def test_cooldown_suppresses_repeats(self) -> None:
         for n in range(20):
-            self.detector.process_event(event("failed_login", 100 + n))
+            self.detector.process_event(event("failed_login", 100 + n), now=100 + n)
         self.assertEqual(self.rules(), ["brute_force"])
-        self.detector.process_event(event("failed_login", 120 + ALERT_COOLDOWN_S))
+        self.detector.process_event(
+            event("failed_login", 120 + ALERT_COOLDOWN_S), now=120 + ALERT_COOLDOWN_S
+        )
         self.assertEqual(self.rules(), ["brute_force", "brute_force"])
 
 

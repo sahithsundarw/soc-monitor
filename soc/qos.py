@@ -71,7 +71,10 @@ class TrafficPolicer:
         now = time.time() if now is None else now
         bucket = self._buckets.get(sensor)
         if bucket is None:
-            return True  # not a policed sender
+            # Fail closed: a sender with no configured bucket could otherwise
+            # bypass rate limiting just by putting a new id in its header.
+            logger.info("Token bucket dropped a frame from unknown sender %s", sensor)
+            return False
         with self._lock:
             allowed = bucket.allow(now)
             outcome = "allowed" if allowed else "dropped"
