@@ -8,3 +8,4 @@ ftp_root/*
 !logs/.gitkeep
 !reports/.gitkeep
 !ftp_root/.gitkeep
+.gstack/
