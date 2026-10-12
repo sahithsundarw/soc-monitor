@@ -3,13 +3,21 @@
 ## Commands (PowerShell, run from soc-monitor/)
 - Create env: `uv venv` then `.venv\Scripts\activate` (Linux: `source .venv/bin/activate`)
 - Install: `uv pip install -r requirements.txt`
-- Tests: `python -m unittest discover -s tests -v`
-- Dashboard: `python -m dashboard.app` → http://127.0.0.1:5000
+- Tests: `python -m unittest discover -s tests -v` (~1 min; network tests use real sockets on ports shifted by +30000..33000, see `tests/helpers.py`)
+- Everything (nodes, FTP, SMTP, dashboard): `python run_demo.py [--noise 0.1] [--verbose]` → http://127.0.0.1:5000; Ctrl+C stops cleanly
+- Experiment CSVs: `python -m datalink.experiment` → `results/`
+- Format: `uvx black .` and `uvx isort --profile black .` (dev tools only, not dependencies)
 - Run modules as packages from the project root (`python -m network.routing`), never `python network/routing.py`.
 
 ## Config
 - `config_loader.load_config()` is the single way to read `config.json`.
-- Each node has `host_ip` (real bind address, 127.0.0.1 on one PC) and `sim_ip` (the logical IPv4 shown in frames and on the dashboard). Moving to two lab PCs means editing `host_ip` only.
+- Each node has `host_ip` (real bind address, 127.0.0.1 on one PC) and `sim_ip` (the logical IPv4 shown in frames and on the dashboard). Moving to two lab PCs means editing `host_ip` only: `SocSystem` starts only nodes whose `host_ip` is local, and services/dashboard only on the SOC's PC.
+
+## Structure notes (beyond the brief's folder list)
+- `datalink/frame.py` frame format + live `LinkSettings`; `network/transport.py` UDP/TCP servers (one frame per datagram / per TCP connection); `network/node.py` forwarding-table cache + noisy `transmit`; `soc/state.py` shared counters; `soc/system.py` wiring; `dashboard/inspector.py` layer breakdown.
+- Collector pipeline order: unframe → CRC (NAK only known sensors) → firewall → token bucket → ACK → dedup → detector. Blocked/policed frames are never ACKed.
+- Detector windows use receive time, never the event's `ts` (forgeable). Token bucket fails closed for unknown senders.
+- API JSON shape is always `{"data": ..., "error": null | "message"}`.
 
 ## Lab code
 `lab_code/` contains no source files, only `README.md` with the lab syllabus. Per hard rule 5, framing.py, crc.py and routing.py use simple textbook-style implementations; flag this to Sahith when writing them.
