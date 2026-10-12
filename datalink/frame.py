@@ -141,6 +141,15 @@ class LinkSettings:
         with self._lock:
             self._error_rate = error_rate
 
+    def add_noise(self, wire: bytes, rng: random.Random) -> tuple[bytes, bool]:
+        """Damage the frame with probability ``error_rate`` (1-3 flipped bits).
+
+        Returns the (possibly damaged) frame and whether it was damaged.
+        """
+        if rng.random() >= self.error_rate:
+            return wire, False
+        return corrupt_wire(wire, self.frame_format, rng.randint(1, 3), rng), True
+
 
 def encode_header(header: Header) -> bytes:
     """Write the header as text fields, each followed by '|'."""
@@ -277,7 +286,9 @@ def run_demo() -> None:
         damaged = corrupt_wire(encoded.wire, frame_format, 2, rng)
         print(f"{method} framing, CRC-16 remainder {encoded.crc_bits}")
         print(f"  wire ({len(encoded.wire)} bytes): {encoded.wire[:24].hex(' ')} ...")
-        print(f"  intact frame CRC ok : {decode_frame(encoded.wire, frame_format).crc_ok}")
+        print(
+            f"  intact frame CRC ok : {decode_frame(encoded.wire, frame_format).crc_ok}"
+        )
         try:
             verdict = decode_frame(damaged, frame_format).crc_ok
         except FrameError as error:

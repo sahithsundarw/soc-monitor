@@ -30,6 +30,9 @@
     "default_ttl": 16,
     "noise_error_rate": 0.0
   },
+  "sensors": {
+    "event_interval_s": 1.5
+  },
   "arq": {
     "timeout_s": 1.0,
     "max_retries": 3

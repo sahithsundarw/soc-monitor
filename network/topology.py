@@ -38,6 +38,7 @@ class Topology:
             node_id: node["role"] for node_id, node in config["nodes"].items()
         }
         self._links: dict[LinkKey, Link] = {}
+        self._version = 0
         for entry in config["links"]:
             self._add_link(entry["a"], entry["b"], entry["cost"])
 
@@ -61,6 +62,19 @@ class Topology:
             return self._links[link_key(a, b)]
         except KeyError:
             raise ValueError(f"No link between {a} and {b}") from None
+
+    @property
+    def version(self) -> int:
+        """Counter bumped on every change, so routers know to rebuild their tables."""
+        with self._lock:
+            return self._version
+
+    def links(self) -> list[tuple[str, str, int, bool]]:
+        """Return (a, b, cost, up) for every link, sorted."""
+        with self._lock:
+            return sorted(
+                (a, b, link.cost, link.up) for (a, b), link in self._links.items()
+            )
 
     def node_ids(self) -> list[str]:
         """Return all node ids in alphabetical order."""
@@ -92,12 +106,14 @@ class Topology:
         """Take a link down, as if the cable were cut."""
         with self._lock:
             self._get_link(a, b).up = False
+            self._version += 1
         logger.info("Link %s-%s failed", a, b)
 
     def restore_link(self, a: str, b: str) -> None:
         """Bring a failed link back up."""
         with self._lock:
             self._get_link(a, b).up = True
+            self._version += 1
         logger.info("Link %s-%s restored", a, b)
 
     def set_cost(self, a: str, b: str, cost: int) -> None:
@@ -105,4 +121,5 @@ class Topology:
         self._check_cost(cost)
         with self._lock:
             self._get_link(a, b).cost = cost
+            self._version += 1
         logger.info("Link %s-%s cost set to %d", a, b, cost)
