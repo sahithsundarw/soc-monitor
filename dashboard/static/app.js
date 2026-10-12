@@ -917,8 +917,8 @@ async function runCommand(command, button) {
   for (const other of $("diag-buttons").querySelectorAll(".btn")) other.classList.remove("is-active");
   button.classList.add("is-active");
   $("terminal-title").textContent = command.label;
-  $("terminal-meta").textContent = "running…";
-  $("terminal").textContent = "Running…";
+  $("terminal-meta").textContent = "runningâ€¦";
+  $("terminal").textContent = "Runningâ€¦";
   const started = performance.now();
   const result = await runAction(
     button,

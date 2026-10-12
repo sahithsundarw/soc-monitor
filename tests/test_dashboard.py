@@ -2,6 +2,7 @@
 
 import unittest
 from dataclasses import asdict
+from pathlib import Path
 from typing import Any
 
 from dashboard.app import create_app
@@ -59,6 +60,16 @@ class PageTest(DashboardTestCase):
         page = self.client.get("/").data
         self.assertNotIn(b"http://", page)
         self.assertNotIn(b"https://", page)
+
+
+class EncodingTest(unittest.TestCase):
+    """Jinja and browsers read the frontend as UTF-8; a stray cp1252 byte breaks it."""
+
+    def test_frontend_files_are_utf8(self) -> None:
+        root = Path(__file__).resolve().parent.parent / "dashboard"
+        for path in [*root.glob("templates/*.html"), *root.glob("static/*.*")]:
+            with self.subTest(file=path.name):
+                path.read_bytes().decode("utf-8")
 
 
 class StatusApiTest(DashboardTestCase):
