@@ -4,12 +4,239 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>SOC Monitor</title>
+    <link rel="icon" href="data:,">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   </head>
   <body>
-    <main class="placeholder">
-      <h1>SOC Monitor</h1>
-      <p>Security telemetry dashboard. Live panels arrive in Phase 5.</p>
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span>SOC Monitor</span>
+      </div>
+      <nav class="nav" aria-label="Sections">
+        <button class="nav-item is-active" data-tab="overview">Overview</button>
+        <button class="nav-item" data-tab="topology">Topology</button>
+        <button class="nav-item" data-tab="controls">Controls</button>
+        <button class="nav-item" data-tab="inspector">Packet Inspector</button>
+        <button class="nav-item" data-tab="reports">Reports</button>
+        <button class="nav-item" data-tab="emails">Emails</button>
+        <button class="nav-item" data-tab="diagnostics">Diagnostics</button>
+      </nav>
+      <button class="theme-toggle" id="theme-toggle" type="button">Dark mode</button>
+    </aside>
+
+    <header class="topbar">
+      <h1 class="page-title" id="page-title">Overview</h1>
+      <div class="topbar-stats">
+        <span class="status-pill" id="status-pill" data-state="loading">Connecting</span>
+        <span class="topbar-counter"><strong id="top-events">0</strong> events</span>
+        <span class="topbar-counter"><strong id="top-alerts">0</strong> alerts</span>
+        <span class="topbar-counter">S1 route <strong class="mono" id="top-route">-</strong></span>
+      </div>
+    </header>
+
+    <main class="content">
+      <!-- Overview -->
+      <section class="tab is-active" id="tab-overview">
+        <div class="tiles">
+          <div class="tile"><span class="tile-label">Events received</span><span class="tile-value" id="tile-events">0</span></div>
+          <div class="tile"><span class="tile-label">Alerts</span><span class="tile-value" id="tile-alerts">0</span></div>
+          <div class="tile"><span class="tile-label">Corrupted frames</span><span class="tile-value" id="tile-corrupted">0</span></div>
+          <div class="tile"><span class="tile-label">Retransmissions</span><span class="tile-value" id="tile-retransmissions">0</span></div>
+          <div class="tile"><span class="tile-label">Firewall blocks</span><span class="tile-value" id="tile-firewall_blocks">0</span></div>
+        </div>
+        <div class="grid">
+          <article class="card span-7 card-tall">
+            <h2 class="card-title">Live alerts</h2>
+            <ul class="alert-feed" id="alert-feed"></ul>
+            <p class="empty" id="alert-empty">No alerts yet. Launch an attack from Controls to see one.</p>
+          </article>
+          <article class="card span-5">
+            <h2 class="card-title">Token bucket, last 60 s</h2>
+            <canvas class="chart" id="qos-chart" height="200" aria-label="Allowed and dropped frames per second"></canvas>
+            <div class="legend">
+              <span><i class="swatch swatch-allowed"></i>Allowed</span>
+              <span><i class="swatch swatch-dropped"></i>Dropped</span>
+            </div>
+          </article>
+          <article class="card span-5">
+            <h2 class="card-title">UDP vs TCP</h2>
+            <div class="split-bar" id="split-bar"><span class="split-udp"></span><span class="split-tcp"></span></div>
+            <div class="split-labels">
+              <span><i class="swatch swatch-allowed"></i>UDP routine <strong id="split-udp">0</strong></span>
+              <span><i class="swatch swatch-dropped"></i>TCP high priority <strong id="split-tcp">0</strong></span>
+            </div>
+          </article>
+          <article class="card span-12">
+            <h2 class="card-title">Frames per sensor</h2>
+            <table class="table" id="sensor-table">
+              <thead>
+                <tr><th>Sensor</th><th>Protocol</th><th class="num">Good</th><th class="num">Corrupted</th><th class="num">Retransmitted</th><th class="num">Lost</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </article>
+        </div>
+      </section>
+
+      <!-- Topology -->
+      <section class="tab" id="tab-topology">
+        <div class="grid">
+          <article class="card span-12">
+            <div class="card-head">
+              <h2 class="card-title">Network</h2>
+              <div class="segmented" id="route-picker" role="group" aria-label="Show route from">
+                {% for sensor in sensors %}
+                <button type="button" data-sensor="{{ sensor }}" class="{{ 'is-active' if loop.first else '' }}">Route from {{ sensor }}</button>
+                {% endfor %}
+              </div>
+            </div>
+            <svg class="topology" id="topology" viewBox="24 48 752 324" role="img" aria-label="Network topology"></svg>
+            <p class="route-line" id="route-line">Loading topology</p>
+          </article>
+          <article class="card span-5">
+            <h2 class="card-title">Links</h2>
+            <table class="table" id="link-table">
+              <thead><tr><th>Link</th><th class="num">Cost</th><th>State</th><th></th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </article>
+          <article class="card span-7">
+            <h2 class="card-title">Forwarding tables (next hop)</h2>
+            <div class="table-scroll">
+              <table class="table mono-cells" id="fwd-table"><thead></thead><tbody></tbody></table>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- Controls -->
+      <section class="tab" id="tab-controls">
+        <div class="grid">
+          <article class="card span-6">
+            <h2 class="card-title">Line noise</h2>
+            <p class="hint">Chance that a frame is damaged on each link it crosses. Damaged frames fail the CRC and are NAKed.</p>
+            <div class="slider-row">
+              <input type="range" id="noise-slider" min="0" max="50" step="1" value="0" aria-label="Frame error rate">
+              <span class="slider-value" id="noise-value">0%</span>
+            </div>
+            <button class="btn btn-primary" id="noise-apply" type="button">Apply noise</button>
+          </article>
+          <article class="card span-6">
+            <h2 class="card-title">Link layer</h2>
+            <p class="hint">Sender and receivers switch together.</p>
+            <div class="field">
+              <span class="field-label">Framing</span>
+              <div class="segmented" id="method-picker" role="group" aria-label="Framing method">
+                {% for method in methods %}
+                <button type="button" data-method="{{ method }}">{{ 'Character stuffing' if method == 'character' else 'Bit stuffing' }}</button>
+                {% endfor %}
+              </div>
+            </div>
+            <div class="field">
+              <span class="field-label">CRC</span>
+              <div class="segmented" id="crc-picker" role="group" aria-label="CRC type">
+                {% for crc in crc_types %}
+                <button type="button" data-crc="{{ crc }}">{{ crc }}</button>
+                {% endfor %}
+              </div>
+            </div>
+          </article>
+          <article class="card span-6">
+            <h2 class="card-title">Attacks</h2>
+            <p class="hint">Each attack is a burst of real events sent through the network.</p>
+            <div class="button-row">
+              <button class="btn" type="button" data-attack="brute_force">Launch brute force</button>
+              <button class="btn" type="button" data-attack="port_scan">Launch port scan</button>
+              <button class="btn" type="button" data-attack="beacon">Start malware beacon</button>
+            </div>
+          </article>
+          <article class="card span-6">
+            <h2 class="card-title">Flooding</h2>
+            <p class="hint">A flood ignores Stop-and-Wait. The token bucket drops what exceeds the rate.</p>
+            <div class="field">
+              <label class="field-label" for="flood-sensor">Sensor</label>
+              <select id="flood-sensor" class="select">
+                {% for sensor in sensors %}<option value="{{ sensor }}">{{ sensor }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="button-row">
+              <button class="btn" type="button" id="flood-btn">Flood from sensor</button>
+              <button class="btn" type="button" id="spoof-btn">Send from unknown IP</button>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- Packet Inspector -->
+      <section class="tab" id="tab-inspector">
+        <div class="grid">
+          <article class="card span-4 card-tall">
+            <h2 class="card-title">Recent events</h2>
+            <ul class="event-list" id="event-list"></ul>
+            <p class="empty" id="event-empty">Waiting for the first event</p>
+          </article>
+          <div class="span-8 layers" id="layers">
+            <article class="card"><p class="empty">Select an event to see it at each layer.</p></article>
+          </div>
+        </div>
+      </section>
+
+      <!-- Reports -->
+      <section class="tab" id="tab-reports">
+        <div class="grid">
+          <article class="card span-4">
+            <h2 class="card-title">Daily alert report</h2>
+            <p class="hint">Writes today's alert summary as .txt and .csv and uploads both to the FTP server.</p>
+            <button class="btn btn-primary" id="report-btn" type="button">Generate &amp; upload report</button>
+          </article>
+          <article class="card span-8">
+            <h2 class="card-title">Files on the FTP server</h2>
+            <table class="table" id="ftp-table">
+              <thead><tr><th>File</th><th class="num">Size</th><th>Modified</th></tr></thead>
+              <tbody></tbody>
+            </table>
+            <p class="empty" id="ftp-empty">No files uploaded yet</p>
+          </article>
+        </div>
+      </section>
+
+      <!-- Emails -->
+      <section class="tab" id="tab-emails">
+        <div class="grid">
+          <article class="card span-5 card-tall">
+            <h2 class="card-title">Inbox</h2>
+            <ul class="inbox" id="inbox"></ul>
+            <p class="empty" id="inbox-empty">No alert emails yet. HIGH and CRITICAL alerts are emailed here.</p>
+          </article>
+          <article class="card span-7 card-tall">
+            <h2 class="card-title" id="mail-subject">Message</h2>
+            <p class="mail-meta" id="mail-meta"></p>
+            <pre class="mail-body" id="mail-body">Select an email to read it.</pre>
+          </article>
+        </div>
+      </section>
+
+      <!-- Diagnostics -->
+      <section class="tab" id="tab-diagnostics">
+        <div class="grid">
+          <article class="card span-4">
+            <h2 class="card-title">Run a command</h2>
+            <div class="field">
+              <label class="field-label" for="diag-target">Target</label>
+              <select id="diag-target" class="select"></select>
+            </div>
+            <div class="button-col" id="diag-buttons"></div>
+          </article>
+          <article class="card span-8">
+            <h2 class="card-title" id="terminal-title">Output</h2>
+            <pre class="terminal" id="terminal">Pick a command to run it here.</pre>
+          </article>
+        </div>
+      </section>
     </main>
+
+    <div class="toasts" id="toasts" aria-live="polite"></div>
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
   </body>
 </html>

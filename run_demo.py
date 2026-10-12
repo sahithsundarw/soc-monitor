@@ -12,6 +12,7 @@ import time
 from pathlib import Path
 
 from config_loader import PROJECT_ROOT, load_config
+from dashboard.app import DashboardServer, create_app
 from network.routing import format_route
 from soc.system import SocSystem
 
@@ -32,16 +33,16 @@ def setup_logging(verbose: bool, log_file: Path = LOG_FILE) -> None:
     logging.basicConfig(level=logging.INFO, handlers=[file_handler, console])
 
 
-def print_banner(system: SocSystem) -> None:
+def print_banner(system: SocSystem, dashboard: tuple[str, int]) -> None:
     """Short banner, one aligned line per service, then the current routes."""
     print("SOC Monitor  -  secure framing and auto-rerouting")
     print("-" * 52)
-    for name, host, port in system.services():
+    for name, host, port in [("Dashboard (HTTP)", *dashboard), *system.services()]:
         print(f"  {name:<26} {host:>15}:{port}")
     print("-" * 52)
     for sensor_id, route in system.routes().items():
         print(f"  route {sensor_id:<4} {format_route(route['path'], route['cost'])}")
-    print("Press Ctrl+C to stop.")
+    print(f"Open http://{dashboard[0]}:{dashboard[1]}  -  press Ctrl+C to stop.")
 
 
 def parse_args() -> argparse.Namespace:
@@ -63,14 +64,18 @@ def main() -> None:
     system = SocSystem(load_config())
     if args.noise is not None:
         system.settings.set_error_rate(args.noise)
+    web = system.config["services"]["dashboard"]
+    dashboard = DashboardServer(create_app(system), web["host"], web["port"])
     system.start()
-    print_banner(system)
+    dashboard.start()
+    print_banner(system, (web["host"], web["port"]))
     try:
         while True:
             time.sleep(1)  # sleep (unlike a bare wait) is interruptible on Windows
     except KeyboardInterrupt:
         print("\nShutting down ...")
     finally:
+        dashboard.stop()
         system.stop()
         print("All services stopped.")
 
