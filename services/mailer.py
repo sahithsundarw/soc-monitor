@@ -85,23 +85,28 @@ class MailServer:
 
     def __init__(self, smtp_config: dict[str, Any], inbox: Inbox) -> None:
         """Prepare the server; it binds when started."""
-        # aiosmtpd runs on asyncio; we own the event loop so stop() can close it.
-        self._loop = asyncio.new_event_loop()
-        self._controller = Controller(
-            InboxHandler(inbox),
-            loop=self._loop,
-            hostname=smtp_config["host"],
-            port=smtp_config["port"],
-        )
+        self._config = smtp_config
+        self._handler = InboxHandler(inbox)
+        self._loop: asyncio.AbstractEventLoop | None = None
+        self._controller: Controller | None = None
 
     def start(self) -> None:
         """Start the SMTP server in its own thread."""
+        # aiosmtpd runs on asyncio; we own the event loop so stop() can close it.
+        self._loop = asyncio.new_event_loop()
+        self._controller = Controller(
+            self._handler,
+            loop=self._loop,
+            hostname=self._config["host"],
+            port=self._config["port"],
+        )
         self._controller.start()
 
     def stop(self) -> None:
         """Stop the SMTP server and close its event loop."""
-        self._controller.stop()
-        self._loop.close()
+        if self._controller is not None and self._loop is not None:
+            self._controller.stop()
+            self._loop.close()
 
 
 def alert_email(alert: Alert, smtp_config: dict[str, Any]) -> EmailMessage:

@@ -7,6 +7,7 @@ import time
 import unittest
 
 from network.transport import FrameServer, send_tcp
+from soc.collector import is_valid_event
 from soc.system import SocSystem
 from tests.helpers import make_test_config
 
@@ -125,6 +126,14 @@ class NetworkTest(unittest.TestCase):
         )
         self.assertEqual(alert["severity"], "HIGH")
 
+    def test_malformed_event_is_dropped_not_stored(self) -> None:
+        sensor = self.system.sensors["S1"]
+        sensor._send_frame(sensor.build_frame({"id": "bad-1", "type": "port_probe"}))
+        good = sensor.factory.normal()
+        self.assertTrue(sensor.send_event(good))
+        ids = [record["id"] for record in self.system.state.recent_events()]
+        self.assertEqual(ids, [good["id"]])
+
     def test_port_scan_raises_scan_and_unknown_host_alerts(self) -> None:
         self.system.sensors["S2"].launch("port_scan").join(timeout=10)
         self.assertTrue({"port_scan", "unknown_host"} <= self.alert_rules())
@@ -132,6 +141,23 @@ class NetworkTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class EventValidationTest(unittest.TestCase):
+    """The collector only accepts events with the fields it relies on."""
+
+    def test_is_valid_event(self) -> None:
+        event = {
+            "id": "a",
+            "ts": 1.0,
+            "sensor": "fw01",
+            "type": "http_request",
+            "src_ip": "x",
+        }
+        self.assertTrue(is_valid_event(event))
+        self.assertFalse(is_valid_event({**event, "type": "port_probe"}))
+        self.assertFalse(is_valid_event({"id": "a"}))
+        self.assertFalse(is_valid_event(["not", "a", "dict"]))
 
 
 class TwoPcSplitTest(unittest.TestCase):

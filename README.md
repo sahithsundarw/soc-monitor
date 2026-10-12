@@ -91,8 +91,13 @@ network across two lab PCs, edit only the `host_ip` values:
 Settings changed in the dashboard (failed links, framing method, CRC type, noise) apply
 to the nodes on the dashboard's PC. In two-PC mode, change the framing method and CRC
 type in `config.json` on both PCs rather than in the dashboard, so that both sides keep
-encoding frames the same way. The retransmitted and lost counters are counted by the
-sensors, so they appear on the sensors' PC log rather than on the dashboard.
+encoding frames the same way. Two things stay on the sensors' PC:
+
+- The retransmitted and lost counters are counted by the sensors, so they appear in
+  the sensors' PC log rather than on the dashboard.
+- The attack and flood buttons drive sensors in the same process, so with the sensors
+  on PC A they answer "runs on the other PC". For the full 7-step demo, run everything
+  on one PC. Use the two-PC setup to show real frames crossing the lab network.
 
 ## Demo (3–4 minutes)
 

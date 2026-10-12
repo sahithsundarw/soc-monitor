@@ -26,6 +26,9 @@ const view = {
   status: null,
   diagnosticsLoaded: false,
   pointerOnEvents: false,
+  pointerOnLinks: false,
+  pointerOnInbox: false,
+  noiseEdited: false,
 };
 
 // ---------- helpers ----------
@@ -273,7 +276,8 @@ function renderSensorTable(perSensor) {
 function renderControlsState(settings) {
   setActive($("method-picker"), "method", settings.method);
   setActive($("crc-picker"), "crc", settings.crc_type);
-  if (document.activeElement !== $("noise-slider")) {
+  // Don't overwrite a value the presenter has moved but not applied yet.
+  if (!view.noiseEdited) {
     const percent = Math.round(settings.error_rate * 100);
     $("noise-slider").value = percent;
     $("noise-value").textContent = `${percent}%`;
@@ -379,7 +383,11 @@ function renderLinkTable(links) {
         () => api(`/api/links/${action}`, { a: link.a, b: link.b }),
         `Link ${link.a}-${link.b} ${link.up ? "failed" : "restored"}. Routes recomputed.`,
       );
-      if (done) refreshTab();
+      if (done) {
+        view.pointerOnLinks = false;
+        await refreshTopology();
+        view.pointerOnLinks = row.matches(":hover");
+      }
     });
     cell.appendChild(button);
     row.appendChild(cell);
@@ -409,7 +417,8 @@ function renderForwardingTables(topology) {
 async function refreshTopology() {
   const topology = await api("/api/topology");
   drawTopology(topology);
-  renderLinkTable(topology.links);
+  // Hold the table still under the pointer so a poll can't swallow a click.
+  if (!view.pointerOnLinks) renderLinkTable(topology.links);
   renderForwardingTables(topology);
 }
 
@@ -428,11 +437,13 @@ function initTopology() {
 function initControls() {
   const slider = $("noise-slider");
   slider.addEventListener("input", () => {
+    view.noiseEdited = true;
     $("noise-value").textContent = `${slider.value}%`;
   });
-  $("noise-apply").addEventListener("click", (event) => {
+  $("noise-apply").addEventListener("click", async (event) => {
     const rate = Number(slider.value) / 100;
-    runAction(event.currentTarget, () => api("/api/noise", { error_rate: rate }), `Noise set to ${slider.value}% per link`);
+    await runAction(event.currentTarget, () => api("/api/noise", { error_rate: rate }), `Noise set to ${slider.value}% per link`);
+    view.noiseEdited = false;
   });
 
   for (const button of $("method-picker").querySelectorAll("button")) {
@@ -574,10 +585,15 @@ async function refreshEvents() {
   renderEventList(await api("/api/events"));
 }
 
+function holdWhileHovered(element, flag) {
+  element.addEventListener("mouseenter", () => { view[flag] = true; });
+  element.addEventListener("mouseleave", () => { view[flag] = false; });
+}
+
 function initInspector() {
-  const list = $("event-list");
-  list.addEventListener("mouseenter", () => { view.pointerOnEvents = true; });
-  list.addEventListener("mouseleave", () => { view.pointerOnEvents = false; });
+  holdWhileHovered($("event-list"), "pointerOnEvents");
+  holdWhileHovered($("link-table"), "pointerOnLinks");
+  holdWhileHovered($("inbox"), "pointerOnInbox");
 }
 
 // ---------- reports, emails, diagnostics ----------
@@ -608,6 +624,7 @@ function showMail(mail) {
 }
 
 async function refreshInbox() {
+  if (view.pointerOnInbox) return;
   const mails = await api("/api/emails");
   $("inbox-empty").hidden = mails.length > 0;
   const inbox = $("inbox");

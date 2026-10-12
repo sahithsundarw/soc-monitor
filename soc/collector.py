@@ -33,6 +33,17 @@ from soc.state import UNKNOWN_SENDER, SocState
 
 logger = logging.getLogger("soc.collector")
 
+REQUIRED_EVENT_FIELDS = ("id", "ts", "sensor", "type", "src_ip")
+TYPE_FIELDS = {"port_probe": ("dst_port",), "beacon": ("dst_ip",)}
+
+
+def is_valid_event(payload: object) -> bool:
+    """True if the payload has every field the detector and dashboard rely on."""
+    if not isinstance(payload, dict):
+        return False
+    needed = REQUIRED_EVENT_FIELDS + TYPE_FIELDS.get(payload.get("type"), ())
+    return all(field in payload for field in needed)
+
 
 class Collector(Node):
     """The SOC node: TCP and UDP servers on the collector's port."""
@@ -126,6 +137,10 @@ class Collector(Node):
         """Good DATA frame: police it, ACK it, then process it unless duplicate."""
         header = frame.header
         if not self.passes_entrance(header, protocol):
+            return
+        if not is_valid_event(frame.payload):
+            # Intact frame but not an event we understand: drop it, never store it.
+            logger.warning("Dropped a malformed event from %s", header.src_id)
             return
         self.reply(make_ack(frame, self.default_ttl), protocol)
         if not self.receiver.is_new(frame):
