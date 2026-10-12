@@ -52,7 +52,7 @@ class NetworkTest(unittest.TestCase):
 
     def setUp(self) -> None:
         logging.disable(logging.WARNING)  # noise tests log many expected warnings
-        self.system = SocSystem(make_test_config())
+        self.system = SocSystem(make_test_config(), alerts_file=None)
         self.system.start()
 
     def tearDown(self) -> None:
@@ -98,9 +98,36 @@ class NetworkTest(unittest.TestCase):
                 with self.subTest(method=method, crc=crc_type):
                     self.assertTrue(sensor.send_event(sensor.factory.normal()))
 
-    def test_flood_is_not_acknowledged_one_by_one(self) -> None:
-        self.system.sensors["S1"].flood(20)
-        self.assertTrue(wait_until(lambda: self.system.state.totals()["good"] >= 15))
+    def alert_rules(self) -> set[str]:
+        """Rules of every alert raised so far."""
+        return {alert["rule"] for alert in self.system.alerts.recent()}
+
+    def test_flood_is_policed_and_raises_flooding_alert(self) -> None:
+        self.system.sensors["S1"].flood(60)
+        self.assertTrue(wait_until(lambda: "flooding" in self.alert_rules()))
+        totals = self.system.policer.totals()["S1"]
+        self.assertGreater(totals["dropped"], 20)
+        self.assertLessEqual(totals["allowed"], 15)
+
+    def test_spoofed_source_is_blocked_by_firewall(self) -> None:
+        self.system.sensors["S1"].flood(5, spoof_ip="203.0.113.66")
+        self.assertTrue(
+            wait_until(lambda: self.system.firewall.stats()["blocked"] == 5)
+        )
+        self.assertIn("firewall_block", self.alert_rules())
+        self.assertEqual(self.system.state.totals()["good"], 0)
+
+    def test_brute_force_attack_raises_high_alert(self) -> None:
+        self.system.sensors["S3"].launch("brute_force").join(timeout=10)
+        self.assertIn("brute_force", self.alert_rules())
+        alert = next(
+            a for a in self.system.alerts.recent() if a["rule"] == "brute_force"
+        )
+        self.assertEqual(alert["severity"], "HIGH")
+
+    def test_port_scan_raises_scan_and_unknown_host_alerts(self) -> None:
+        self.system.sensors["S2"].launch("port_scan").join(timeout=10)
+        self.assertTrue({"port_scan", "unknown_host"} <= self.alert_rules())
 
 
 if __name__ == "__main__":

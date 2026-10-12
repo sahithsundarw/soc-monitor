@@ -6,23 +6,32 @@ whole simulated network at once.
 """
 
 import logging
+from pathlib import Path
 from typing import Any
 
+from config_loader import PROJECT_ROOT
 from datalink.frame import FrameFormat, LinkSettings
 from network.router import Router
 from network.routing import shortest_path
 from network.topology import Topology
 from soc.collector import Collector
+from soc.detector import AlertStore, Detector
+from soc.firewall import Firewall
+from soc.qos import TrafficPolicer
 from soc.sensor import Sensor
 from soc.state import SocState
 
 logger = logging.getLogger("soc.system")
 
+ALERTS_FILE = PROJECT_ROOT / "logs" / "alerts.jsonl"
+
 
 class SocSystem:
     """All nodes of the simulated network plus the shared state they update."""
 
-    def __init__(self, config: dict[str, Any]) -> None:
+    def __init__(
+        self, config: dict[str, Any], alerts_file: Path | None = ALERTS_FILE
+    ) -> None:
         """Create (but do not start) every node described in the config."""
         self.config = config
         self.topology = Topology(config)
@@ -37,8 +46,25 @@ class SocSystem:
             n for n, v in nodes.items() if v["role"] == "collector"
         )
         self.state = SocState(self.sensor_ids)
+        self.alerts = AlertStore(alerts_file)
+        self.detector = Detector(config, self.alerts.add)
+        self.firewall = Firewall(config["firewall"])
+        flood_window = config["qos"]["flood_window_s"]
+        self.policer = TrafficPolicer(
+            config["qos"],
+            lambda sensor, drops: self.detector.report_flooding(
+                sensor, drops, flood_window
+            ),
+        )
         self.collector = Collector(
-            self.collector_id, config, self.topology, self.settings, self.state
+            self.collector_id,
+            config,
+            self.topology,
+            self.settings,
+            self.state,
+            self.firewall,
+            self.policer,
+            self.detector,
         )
         self.routers = {
             rid: Router(rid, config, self.topology, self.settings)
