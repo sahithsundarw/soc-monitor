@@ -1,0 +1,5 @@
+data_kind,method,frames,avg_bits_before,avg_bits_after,overhead_pct
+random bytes,character,1000,801.6,807.9,0.786
+random bytes,bit,1000,801.6,814.4,1.599
+event JSON,character,1000,805.1,813.1,0.994
+event JSON,bit,1000,805.1,809.1,0.497
