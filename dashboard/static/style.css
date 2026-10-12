@@ -864,10 +864,11 @@ output {
   width: 88px;
 }
 
+/* Quiet, but still visibly a button: a hairline border, not bare text. */
 .btn-ghost {
   height: 32px;
   padding: 0 8px;
-  border-color: transparent;
+  border-color: var(--line);
   background: transparent;
   color: var(--muted);
   font-weight: 400;
