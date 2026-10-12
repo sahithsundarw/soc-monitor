@@ -15,6 +15,7 @@ const TAB_TITLES = {
   diagnostics: "Diagnostics",
 };
 const SEVERITIES = ["CRITICAL", "HIGH", "MEDIUM", "LOW"];
+const SEVERITY_NAMES = { CRITICAL: "Critical", HIGH: "High", MEDIUM: "Medium", LOW: "Low" };
 const METHOD_NAMES = { character: "Character stuffing", bit: "Bit stuffing" };
 const SVG_NS = "http://www.w3.org/2000/svg";
 
@@ -59,12 +60,6 @@ function svg(tag, attrs) {
   return node;
 }
 
-function icon(name, className) {
-  const node = svg("svg", { class: className || "icon", "aria-hidden": "true" });
-  node.appendChild(svg("use", { href: `#i-${name}` }));
-  return node;
-}
-
 function cssVar(name) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
@@ -92,6 +87,10 @@ function sum(values) {
   return values.reduce((total, value) => total + value, 0);
 }
 
+function routeText(path) {
+  return path.join(" → ");
+}
+
 function storageGet(key) {
   try {
     return localStorage.getItem(key);
@@ -106,6 +105,10 @@ function storageSet(key, value) {
   } catch (error) {
     // Storage can be unavailable (private mode); the setting just isn't remembered.
   }
+}
+
+function isNetworkError(error) {
+  return error instanceof TypeError && /fetch/i.test(error.message);
 }
 
 async function api(path, payload) {
@@ -149,12 +152,20 @@ function holdWhileHovered(element, flag) {
   element.addEventListener("mouseleave", () => { view[flag] = false; });
 }
 
+function keyValues(pairs, monoKeys) {
+  const list = el("dl", "kv");
+  for (const [key, value] of pairs) {
+    list.appendChild(el("dt", "", key));
+    list.appendChild(el("dd", (monoKeys || []).includes(key) ? "mono" : "", value));
+  }
+  return list;
+}
+
 // ---------- theme and tabs ----------
 
 function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
-  $("theme-label").textContent = theme === "dark" ? "Light mode" : "Dark mode";
-  $("theme-icon").setAttribute("href", theme === "dark" ? "#i-sun" : "#i-moon");
+  $("theme-toggle").textContent = theme === "dark" ? "Light mode" : "Dark mode";
   if (view.status) drawQosChart(view.status.qos.timeline);
 }
 
@@ -196,22 +207,27 @@ function initTabs() {
 
 // ---------- top bar and sidebar ----------
 
+function setStatus(state, text) {
+  const status = $("top-status");
+  status.dataset.state = state;
+  status.textContent = text;
+}
+
 function renderTopbar(status) {
-  const pill = $("status-pill");
-  pill.dataset.state = status.running ? "running" : "stopped";
-  pill.textContent = status.running ? "Running" : "Stopped";
-  $("top-uptime").textContent = status.uptime_s === null ? "" : `up ${formatDuration(status.uptime_s)}`;
+  if (status.running) {
+    setStatus("running", status.uptime_s === null ? "Running" : `Running ${formatDuration(status.uptime_s)}`);
+  } else {
+    setStatus("stopped", "Stopped");
+  }
   $("top-events").textContent = formatNumber(status.tiles.events);
-  $("top-events-label").textContent = plural(status.tiles.events, "event");
   $("top-alerts").textContent = formatNumber(status.tiles.alerts);
-  $("top-alerts-label").textContent = plural(status.tiles.alerts, "alert");
   const route = status.routes.S1;
-  $("top-route").textContent = route && route.path.length ? route.path.join(" > ") : "no route";
+  $("top-route").textContent = route && route.path.length ? routeText(route.path) : "no route";
 }
 
 function renderSidebar(status) {
   const { settings } = status;
-  $("side-method").textContent = METHOD_NAMES[settings.method] || settings.method;
+  $("side-method").textContent = settings.method === "bit" ? "Bit" : "Character";
   $("side-crc").textContent = settings.crc_type;
   $("side-noise").textContent = `${Math.round(settings.error_rate * 100)}%`;
   const count = $("nav-email-count");
@@ -220,45 +236,19 @@ function renderSidebar(status) {
 }
 
 function renderFreshness() {
-  const label = $("top-updated");
-  if (!view.lastUpdate) {
-    label.textContent = "";
-    return;
-  }
+  if (!view.lastUpdate) return;
   const age = Date.now() - view.lastUpdate;
-  label.textContent = age < 2000 ? "updated just now" : `updated ${Math.round(age / 1000)}s ago`;
-  if (age > STALE_AFTER_MS) {
-    $("status-pill").dataset.state = "stopped";
-    $("status-pill").textContent = "Disconnected";
-  }
+  if (age > STALE_AFTER_MS) setStatus("stale", `Stale ${Math.round(age / 1000)}s`);
 }
 
-// ---------- overview: tiles and sparklines ----------
-
-function drawSparkline(target, series) {
-  const width = 120;
-  const height = 28;
-  const peak = Math.max(1, ...series);
-  const step = width / Math.max(1, series.length - 1);
-  const points = series.map((value, index) => {
-    const x = (index * step).toFixed(1);
-    const y = (height - 2 - (value / peak) * (height - 4)).toFixed(1);
-    return `${x},${y}`;
-  });
-  const area = `0,${height} ${points.join(" ")} ${width},${height}`;
-  target.replaceChildren(
-    svg("polygon", { points: area, class: "spark-area" }),
-    svg("polyline", { points: points.join(" "), class: "spark-line" }),
-  );
-}
+// ---------- overview: stat strip ----------
 
 function renderTiles(status) {
   for (const [key, value] of Object.entries(status.tiles)) {
     $(`tile-${key}`).textContent = formatNumber(value);
-    const series = status.trends[key] || [];
-    const lastMinute = sum(series);
-    $(`rate-${key}`).textContent = lastMinute ? `+${formatNumber(lastMinute)} in the last minute` : "none in the last minute";
-    drawSparkline($(`spark-${key}`), series);
+    // Show the per-minute rate only when it says something the total does not.
+    const lastMinute = sum(status.trends[key] || []);
+    $(`rate-${key}`).textContent = lastMinute && lastMinute !== value ? `+${formatNumber(lastMinute)}/min` : "";
   }
 }
 
@@ -277,19 +267,16 @@ function renderSeverityChips(counts) {
 }
 
 function alertItem(alert) {
-  const item = el("li", `alert-item alert-${alert.severity}`);
+  const item = el("li", "alert-item");
   const key = alertKey(alert);
   if (!view.seenAlerts.has(key) && !view.firstAlertRender) item.classList.add("is-new");
   view.seenAlerts.add(key);
-  item.appendChild(el("span", "alert-bar"));
+  item.appendChild(el("span", "alert-time", formatTime(alert.ts)));
+  item.appendChild(el("span", `alert-severity sev-${alert.severity}`, SEVERITY_NAMES[alert.severity]));
   const text = el("div");
-  const head = el("div", "alert-head");
-  head.appendChild(el("span", `badge badge-${alert.severity}`, alert.severity));
-  head.appendChild(el("span", "alert-title", alert.title));
-  text.appendChild(head);
+  text.appendChild(el("div", "alert-title", alert.title));
   text.appendChild(el("div", "alert-detail", alert.detail));
   item.appendChild(text);
-  item.appendChild(el("span", "alert-time", formatTime(alert.ts)));
   return item;
 }
 
@@ -298,9 +285,9 @@ function renderAlerts(alerts) {
   const empty = $("alert-empty");
   empty.hidden = shown.length > 0;
   if (!alerts.length) {
-    empty.textContent = "No alerts yet. Launch an attack from Controls to see one.";
-  } else {
-    empty.textContent = `No ${view.alertFilter.toLowerCase()} alerts among the latest ${alerts.length}.`;
+    empty.textContent = "No alerts yet";
+  } else if (view.alertFilter !== "ALL") {
+    empty.textContent = `No ${SEVERITY_NAMES[view.alertFilter].toLowerCase()} alerts`;
   }
   const feed = $("alert-feed");
   feed.hidden = shown.length === 0;
@@ -309,9 +296,9 @@ function renderAlerts(alerts) {
 }
 
 function initAlertFilter() {
-  for (const chip of $("severity-chips").querySelectorAll("button")) {
-    chip.addEventListener("click", () => {
-      view.alertFilter = chip.dataset.severity;
+  for (const button of $("severity-chips").querySelectorAll("button")) {
+    button.addEventListener("click", () => {
+      view.alertFilter = button.dataset.severity;
       if (view.status) {
         renderSeverityChips(view.status.severity_counts);
         renderAlerts(view.status.alerts);
@@ -325,28 +312,15 @@ function initAlertFilter() {
 function chartGeometry(canvas, count) {
   const width = canvas.clientWidth;
   const height = canvas.clientHeight;
-  const left = 36;
-  const bottom = height - 22;
-  return { width, height, left, bottom, plotHeight: bottom - 8, slot: (width - left) / count };
+  const left = 40;
+  const top = 40; // room for the unit label above the highest tick
+  const bottom = height - 24;
+  return { width, height, left, top, bottom, plotHeight: bottom - top, slot: (width - left) / count };
 }
 
 function niceTop(peak) {
   const step = peak <= 10 ? 2 : peak <= 50 ? 10 : peak <= 200 ? 50 : 100;
   return Math.max(step * 2, Math.ceil(peak / (2 * step)) * 2 * step); // even, so the midline is whole
-}
-
-function hatchPattern(ctx, color) {
-  const tile = document.createElement("canvas");
-  tile.width = 6;
-  tile.height = 6;
-  const tileCtx = tile.getContext("2d");
-  tileCtx.strokeStyle = color;
-  tileCtx.lineWidth = 1.5;
-  tileCtx.beginPath();
-  tileCtx.moveTo(-1, 7);
-  tileCtx.lineTo(7, -1);
-  tileCtx.stroke();
-  return ctx.createPattern(tile, "repeat");
 }
 
 function fillBar(ctx, x, y, width, height, roundTop) {
@@ -369,19 +343,22 @@ function drawQosChart(timeline) {
   ctx.clearRect(0, 0, geo.width, geo.height);
 
   const top = niceTop(Math.max(0, ...timeline.map((s) => s.allowed + s.dropped)));
-  const muted = cssVar("--text-muted");
-  ctx.font = `13px ${cssVar("--font-ui")}`;
-  ctx.lineWidth = 1;
+  const muted = cssVar("--muted");
+  ctx.font = `14px ${cssVar("--font-ui")}`;
+  ctx.fillStyle = muted;
+  ctx.textAlign = "left";
+  ctx.fillText("frames per second", 0, 14);
   for (const fraction of [0, 0.5, 1]) {
     const y = Math.round(geo.bottom - geo.plotHeight * fraction) + 0.5;
-    ctx.strokeStyle = cssVar("--border");
+    ctx.strokeStyle = cssVar("--line");
+    ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(geo.left, y);
     ctx.lineTo(geo.width, y);
     ctx.stroke();
     ctx.fillStyle = muted;
     ctx.textAlign = "right";
-    ctx.fillText(String(top * fraction), geo.left - 8, y + 4);
+    ctx.fillText(String(top * fraction), geo.left - 8, y + 5);
   }
   ctx.textAlign = "left";
   ctx.fillText("60 s ago", geo.left, geo.height - 4);
@@ -389,12 +366,12 @@ function drawQosChart(timeline) {
   ctx.fillText("now", geo.width, geo.height - 4);
 
   if (view.chartHover !== null) {
-    ctx.fillStyle = cssVar("--surface-sunken");
-    ctx.fillRect(geo.left + view.chartHover * geo.slot, 8, geo.slot, geo.plotHeight);
+    ctx.fillStyle = cssVar("--fill-strong");
+    ctx.fillRect(geo.left + view.chartHover * geo.slot, geo.top, geo.slot, geo.plotHeight);
   }
 
-  const accent = cssVar("--accent");
-  const dropped = hatchPattern(ctx, cssVar("--neutral-series"));
+  const accent = cssVar("--series-primary");
+  const neutral = cssVar("--neutral-series");
   const barWidth = Math.max(1, geo.slot - 2);
   timeline.forEach((second, index) => {
     const x = geo.left + index * geo.slot + 1;
@@ -402,9 +379,9 @@ function drawQosChart(timeline) {
     const droppedHeight = (second.dropped / top) * geo.plotHeight;
     ctx.fillStyle = accent;
     fillBar(ctx, x, geo.bottom - allowedHeight, barWidth, allowedHeight, droppedHeight === 0);
-    // 2px gap between the stacked segments.
+    // A 2px gap separates the stacked segments.
     const droppedTop = geo.bottom - allowedHeight - droppedHeight - (allowedHeight ? 2 : 0);
-    ctx.fillStyle = dropped;
+    ctx.fillStyle = neutral;
     fillBar(ctx, x, droppedTop, barWidth, droppedHeight, true);
   });
 }
@@ -429,8 +406,14 @@ function showChartTip(index) {
   const geo = chartGeometry($("qos-chart"), timeline.length);
   const x = geo.left + (index + 0.5) * geo.slot;
   const flip = x > geo.width / 2;
-  tip.style.left = flip ? "" : `${x + 12}px`;
-  tip.style.right = flip ? `${geo.width - x + 12}px` : "";
+  tip.style.left = flip ? "" : `${x + 16}px`;
+  tip.style.right = flip ? `${geo.width - x + 16}px` : "";
+}
+
+function hideChartTip() {
+  view.chartHover = null;
+  $("qos-tip").hidden = true;
+  if (view.status) drawQosChart(view.status.qos.timeline);
 }
 
 function initChartHover() {
@@ -453,12 +436,6 @@ function initChartHover() {
   canvas.addEventListener("mouseleave", hideChartTip);
 }
 
-function hideChartTip() {
-  view.chartHover = null;
-  $("qos-tip").hidden = true;
-  if (view.status) drawQosChart(view.status.qos.timeline);
-}
-
 // ---------- overview: split and sensor table ----------
 
 function renderSplit(protocols) {
@@ -469,15 +446,21 @@ function renderSplit(protocols) {
   $("split-bar").children[1].style.width = `${total ? tcpShare : 50}%`;
   $("share-udp").textContent = `${udpShare}%`;
   $("share-tcp").textContent = `${tcpShare}%`;
-  $("split-udp").textContent = `${formatNumber(protocols.udp)} ${plural(protocols.udp, "frame")}`;
-  $("split-tcp").textContent = `${formatNumber(protocols.tcp)} ${plural(protocols.tcp, "frame")}`;
+  $("split-udp").textContent = `(${formatNumber(protocols.udp)})`;
+  $("split-tcp").textContent = `(${formatNumber(protocols.tcp)})`;
+}
+
+function sensorRow(name, values, cellTag) {
+  const row = el("tr");
+  row.appendChild(el(cellTag, "", name));
+  for (const value of values) row.appendChild(el(cellTag, value ? "num" : "num cell-quiet", formatNumber(value)));
+  return row;
 }
 
 function renderSensorTable(perSensor) {
+  const totals = [0, 0, 0, 0, 0];
   const rows = Object.entries(perSensor).map(([sensor, byProtocol]) => {
     const { udp, tcp } = byProtocol;
-    const row = el("tr");
-    row.appendChild(el("td", "cell-strong", sensor === "unknown" ? "Unreadable" : sensor));
     const values = [
       udp.good,
       tcp.good,
@@ -485,10 +468,12 @@ function renderSensorTable(perSensor) {
       udp.retransmitted + tcp.retransmitted,
       udp.lost + tcp.lost,
     ];
-    for (const value of values) row.appendChild(el("td", value ? "num" : "num cell-faint", formatNumber(value)));
-    return row;
+    values.forEach((value, index) => { totals[index] += value; });
+    return sensorRow(sensor === "unknown" ? "Unreadable" : sensor, values, "td");
   });
-  $("sensor-table").querySelector("tbody").replaceChildren(...rows);
+  const table = $("sensor-table");
+  table.querySelector("tbody").replaceChildren(...rows);
+  table.querySelector("tfoot").replaceChildren(sensorRow("All sensors", totals, "td"));
 }
 
 function renderControlsState(settings) {
@@ -517,17 +502,19 @@ function renderStatus(status) {
 }
 
 async function refreshStatus() {
+  let status;
   try {
-    const status = await api("/api/status");
-    view.status = status;
-    view.lastUpdate = Date.now();
-    document.body.classList.remove("is-loading");
-    renderStatus(status);
+    status = await api("/api/status");
   } catch (error) {
-    const pill = $("status-pill");
-    pill.dataset.state = "stopped";
-    pill.textContent = "Disconnected";
+    // Only a failed request means "disconnected"; rendering errors must surface.
+    if (!view.lastUpdate) setStatus("stopped", "Disconnected");
+    renderFreshness();
+    return;
   }
+  view.status = status;
+  view.lastUpdate = Date.now();
+  document.body.classList.remove("is-loading");
+  renderStatus(status);
   renderFreshness();
 }
 
@@ -542,8 +529,6 @@ function routeLinks(path) {
   for (let i = 0; i + 1 < path.length; i += 1) keys.add(linkKey(path[i], path[i + 1]));
   return keys;
 }
-
-const NODE_GLYPHS = { sensor: "sensor", router: "router", collector: "target" };
 
 function drawTopology(topology) {
   const canvas = $("topology");
@@ -564,7 +549,7 @@ function drawTopology(topology) {
     const label = link.up ? String(link.cost) : "down";
     const labelWidth = label.length * 8 + 12;
     canvas.appendChild(svg("rect", { x: midX - labelWidth / 2, y: midY - 10, width: labelWidth, height: 18, rx: 4, class: "topo-cost-bg" }));
-    const cost = svg("text", { x: midX, y: midY + 3, class: "topo-cost" });
+    const cost = svg("text", { x: midX, y: midY + 4, class: "topo-cost" });
     cost.textContent = label;
     canvas.appendChild(cost);
   }
@@ -574,38 +559,35 @@ function drawTopology(topology) {
     if (route.path.includes(node.id)) classes.push("is-route");
     const group = svg("g", { class: classes.join(" "), transform: `translate(${node.x} ${node.y})` });
     group.appendChild(svg("rect", { x: -66, y: -25, width: 132, height: 50, rx: 8 }));
-    const glyph = svg("use", { href: `#i-${NODE_GLYPHS[node.role]}`, x: -56, y: -10, width: 20, height: 20, class: "node-glyph" });
-    const label = svg("text", { x: -28, y: -3, class: "node-id" });
-    label.textContent = node.role === "sensor" ? `${node.id} ${node.name}` : node.id;
-    const ip = svg("text", { x: -28, y: 14, class: "node-ip" });
+    const label = svg("text", { x: -52, y: -3, class: "node-id" });
+    label.textContent = node.id;
+    if (node.role === "sensor") {
+      const name = svg("tspan", { class: "node-name", dx: 6 });
+      name.textContent = node.name;
+      label.appendChild(name);
+    }
+    const ip = svg("text", { x: -52, y: 15, class: "node-ip" });
     ip.textContent = node.sim_ip;
-    group.append(glyph, label, ip);
+    group.append(label, ip);
     canvas.appendChild(group);
   }
 
-  const line = $("route-line");
-  line.replaceChildren();
-  if (route.path.length) {
-    line.append("Current route ");
-    line.appendChild(el("strong", "", route.path.join(" > ")));
-    line.append(`, cost ${route.cost}`);
-  } else {
-    line.textContent = `${view.routeSensor} has no route to the SOC. Restore a link.`;
-  }
+  $("route-line").textContent = route.path.length
+    ? `${routeText(route.path)}, cost ${route.cost}`
+    : "no route to the SOC";
 }
 
 function renderLinkTable(links) {
   const rows = links.map((link) => {
     const row = el("tr");
-    row.appendChild(el("td", "mono", `${link.a} - ${link.b}`));
+    row.appendChild(el("td", "mono", `${link.a} – ${link.b}`));
     row.appendChild(el("td", "num", link.cost));
-    const stateCell = el("td");
-    stateCell.appendChild(el("span", link.up ? "state" : "state state-down", link.up ? "Up" : "Down"));
-    row.appendChild(stateCell);
+    row.appendChild(el("td", link.up ? "" : "state-down", link.up ? "Up" : "Down"));
     const cell = el("td", "num");
     const action = link.up ? "fail" : "restore";
-    const button = el("button", "btn btn-small", link.up ? "Fail link" : "Restore link");
+    const button = el("button", "btn btn-ghost btn-action", link.up ? "Fail" : "Restore");
     button.type = "button";
+    button.setAttribute("aria-label", `${link.up ? "Fail" : "Restore"} link ${link.a}-${link.b}`);
     button.addEventListener("click", async () => {
       const done = await runAction(
         button,
@@ -636,8 +618,7 @@ function renderForwardingTables(topology) {
     row.appendChild(el("td", "cell-strong", router));
     for (const destination of topology.destinations) {
       const isSelf = destination === router;
-      const hop = isSelf ? "self" : nextHops[destination] || "-";
-      row.appendChild(el("td", isSelf ? "cell-faint" : "", hop));
+      row.appendChild(el("td", isSelf ? "cell-quiet" : "", isSelf ? "—" : nextHops[destination] || "-"));
     }
     return row;
   });
@@ -672,7 +653,7 @@ function initControls() {
   });
   $("noise-apply").addEventListener("click", async (event) => {
     const rate = Number(slider.value) / 100;
-    await runAction(event.currentTarget, () => api("/api/noise", { error_rate: rate }), `Noise set to ${slider.value}% per link`);
+    await runAction(event.currentTarget, () => api("/api/noise", { error_rate: rate }), `Line noise set to ${slider.value}% per link`);
     view.noiseEdited = false;
   });
 
@@ -715,7 +696,7 @@ function initControls() {
     runAction(
       event.currentTarget,
       () => api("/api/flood", { sensor: view.floodSensor, spoof: true }),
-      (data) => `Sent ${data.frames} frames from an unknown IP via ${data.sensor}`,
+      (data) => `Sent ${data.frames} spoofed frames via ${data.sensor}`,
     ),
   );
 }
@@ -724,66 +705,53 @@ function initControls() {
 
 function renderEventList(events) {
   $("event-empty").hidden = events.length > 0;
-  const items = events.map((event) => {
-    const item = el("li");
-    const button = el("button", "event-row");
-    button.type = "button";
-    button.dataset.id = event.id;
-    if (event.id === view.selectedEvent) button.classList.add("is-active");
-    const left = el("span");
-    left.appendChild(el("span", "event-type", event.type.replace(/_/g, " ")));
-    left.appendChild(el("span", "event-meta", ` ${event.sensor}`));
-    const right = el("span", "event-meta");
-    right.appendChild(el("span", "proto-tag", event.protocol.toUpperCase()));
-    right.append(formatTime(event.received_at));
-    button.append(left, right);
-    button.addEventListener("click", () => selectEvent(event.id));
-    item.appendChild(button);
-    return item;
+  const rows = events.map((event) => {
+    const row = el("tr");
+    row.tabIndex = 0;
+    row.dataset.id = event.id;
+    if (event.id === view.selectedEvent) row.classList.add("is-active");
+    row.appendChild(el("td", "mono", formatTime(event.received_at)));
+    row.appendChild(el("td", "", event.type.replace(/_/g, " ")));
+    row.appendChild(el("td", "", event.sensor));
+    row.appendChild(el("td", "mono", event.protocol.toUpperCase()));
+    row.addEventListener("click", () => selectEvent(event.id));
+    row.addEventListener("keydown", (keyEvent) => {
+      if (keyEvent.key === "Enter" || keyEvent.key === " ") {
+        keyEvent.preventDefault();
+        selectEvent(event.id);
+      }
+    });
+    return row;
   });
-  $("event-list").replaceChildren(...items);
+  $("event-list").replaceChildren(...rows);
 }
 
-function keyValues(pairs) {
-  const list = el("dl", "kv");
-  for (const [key, value] of pairs) {
-    list.appendChild(el("dt", "", key));
-    list.appendChild(el("dd", "", value));
-  }
-  return list;
+function layerSection(number, title, children) {
+  const section = el("section", "layer");
+  const heading = el("h3", "layer-title");
+  heading.append(el("span", "layer-number", number), title);
+  section.appendChild(heading);
+  for (const child of children) section.appendChild(child);
+  return section;
 }
 
-function layerCard(number, title, concept, children) {
-  const card = el("article", "card");
-  const head = el("div", "layer-head");
-  const heading = el("h2", "layer-title");
-  heading.appendChild(el("span", "layer-number", `Layer ${number}`));
-  heading.append(title);
-  head.append(heading, el("span", "layer-concept", concept));
-  card.appendChild(head);
-  for (const child of children) card.appendChild(child);
-  return card;
-}
-
-async function copyText(text, button) {
+async function copyText(text) {
   try {
     await navigator.clipboard.writeText(text);
     toast("Copied to the clipboard");
   } catch (error) {
-    toast("Copy is not available here; select the text instead.", true);
+    toast("Copy is not available here. Select the text instead.", true);
   }
-  button.blur();
 }
 
 function codeBlock(label, text) {
   const wrapper = el("div");
   const head = el("div", "code-head");
   head.appendChild(el("span", "", label));
-  const copy = el("button", "btn btn-icon");
+  const copy = el("button", "btn btn-ghost", "Copy");
   copy.type = "button";
   copy.setAttribute("aria-label", `Copy ${label.toLowerCase()}`);
-  copy.append(icon("copy"), "Copy");
-  copy.addEventListener("click", () => copyText(text, copy));
+  copy.addEventListener("click", () => copyText(text));
   head.appendChild(copy);
   wrapper.append(head, el("pre", "code", text));
   return wrapper;
@@ -792,41 +760,55 @@ function codeBlock(label, text) {
 function renderLayers(layers) {
   const { application, transport, network, datalink } = layers;
   const priorities = ["normal", "high", "critical"];
+  const head = el("header", "panel-head");
+  head.append(el("h2", "panel-title", "Frame"), el("span", "muted mono", layers.id));
   $("layers").replaceChildren(
-    layerCard(7, "Application", "event JSON from the sensor", [el("pre", "code", application.json)]),
-    layerCard(4, "Transport", transport.note, [
-      keyValues([
-        ["Protocol", transport.protocol],
-        ["Source port", transport.src_port],
-        ["Destination port", transport.dst_port],
-      ]),
+    head,
+    layerSection(7, "Application", [el("pre", "code", application.json)]),
+    layerSection(4, "Transport", [
+      keyValues(
+        [
+          ["Protocol", transport.protocol],
+          ["Source port", transport.src_port],
+          ["Destination port", transport.dst_port],
+          ["Delivery", transport.note],
+        ],
+        ["Source port", "Destination port"],
+      ),
     ]),
-    layerCard(3, "Network", "routed hop by hop with Dijkstra", [
-      keyValues([
-        ["Source IP", network.src_ip],
-        ["Destination IP", network.dst_ip],
-        ["TTL on arrival", `${network.ttl} (${network.hops} router ${plural(network.hops, "hop")})`],
-        ["Path taken", network.path.join(" > ") || "unknown"],
-        ["Priority", `${network.priority} (${priorities[network.priority]})`],
-      ]),
+    layerSection(3, "Network", [
+      keyValues(
+        [
+          ["Source IP", network.src_ip],
+          ["Destination IP", network.dst_ip],
+          ["TTL on arrival", `${network.ttl}, after ${network.hops} router ${plural(network.hops, "hop")}`],
+          ["Path taken", network.path.length ? routeText(network.path) : "unknown"],
+          ["Priority", `${network.priority} (${priorities[network.priority]})`],
+        ],
+        ["Source IP", "Destination IP", "Path taken"],
+      ),
     ]),
-    layerCard(2, "Data link", `${METHOD_NAMES[datalink.method]}, ${datalink.crc_type}`, [
-      keyValues([
-        ["Header", datalink.header_text],
-        ["Frame type, seq", `${datalink.frame_type}, ${datalink.seq_no}`],
-        ["CRC (hex)", datalink.crc_hex],
-        ["CRC (binary)", datalink.crc_bits],
-        ["Size", `${datalink.body_bytes} bytes before stuffing, ${datalink.wire_bytes} on the wire`],
-      ]),
-      codeBlock("Stuffed frame with flags (hex)", datalink.wire_hex),
-      codeBlock("Stuffed frame with flags (binary)", datalink.wire_binary),
+    layerSection(2, "Data link", [
+      keyValues(
+        [
+          ["Framing", METHOD_NAMES[datalink.method]],
+          ["CRC", datalink.crc_type],
+          ["Header", datalink.header_text],
+          ["Frame type, seq", `${datalink.frame_type}, ${datalink.seq_no}`],
+          ["CRC remainder", `${datalink.crc_hex} (${datalink.crc_bits})`],
+          ["Size", `${datalink.body_bytes} bytes before stuffing, ${datalink.wire_bytes} on the wire`],
+        ],
+        ["Header", "CRC remainder"],
+      ),
+      codeBlock("Stuffed frame with flags, hex", datalink.wire_hex),
+      codeBlock("Stuffed frame with flags, binary", datalink.wire_binary),
     ]),
   );
 }
 
 async function selectEvent(eventId) {
   view.selectedEvent = eventId;
-  for (const row of document.querySelectorAll(".event-row")) {
+  for (const row of $("event-list").querySelectorAll("tr")) {
     row.classList.toggle("is-active", row.dataset.id === eventId);
   }
   try {
@@ -854,10 +836,12 @@ async function refreshReports() {
     const row = el("tr");
     row.appendChild(el("td", "mono", file.name));
     row.appendChild(el("td", "num", formatBytes(file.size)));
-    row.appendChild(el("td", "", file.modified));
+    row.appendChild(el("td", "mono", file.modified));
     return row;
   });
   $("ftp-table").querySelector("tbody").replaceChildren(...rows);
+  // The listing is newest first, so its first file is the latest upload.
+  $("report-last").textContent = files.length ? files[0].modified : "never";
 }
 
 function initReports() {
@@ -867,17 +851,33 @@ function initReports() {
       () => api("/api/reports", {}),
       (data) => `Uploaded ${data.uploaded.join(" and ")}`,
     );
-    if (result) {
-      $("report-last").textContent = `${result.uploaded.join(", ")} at ${formatTime(Date.now() / 1000)}`;
-      refreshReports();
-    }
+    if (result) refreshReports();
   });
+}
+
+// Alert emails have subjects like "[HIGH] Brute-force login".
+function splitSubject(subject) {
+  const match = /^\[(\w+)\]\s*(.*)$/.exec(subject);
+  return match ? { severity: match[1], title: match[2] } : { severity: "", title: subject };
 }
 
 function showMail(mail) {
   view.selectedMail = mail.id;
-  $("mail-subject").textContent = mail.subject;
-  $("mail-meta").textContent = `From ${mail.sender} to ${mail.recipient}, received ${formatTime(mail.received_at)}`;
+  const { title } = splitSubject(mail.subject);
+  $("mail-subject").textContent = title;
+  $("mail-meta").replaceWith(
+    Object.assign(
+      keyValues(
+        [
+          ["From", mail.sender],
+          ["To", mail.recipient],
+          ["Received", formatTime(mail.received_at)],
+        ],
+        ["From", "To"],
+      ),
+      { id: "mail-meta" },
+    ),
+  );
   $("mail-body").textContent = mail.body;
 }
 
@@ -890,9 +890,12 @@ async function refreshInbox() {
     const button = el("button", "mail-row");
     button.type = "button";
     if (mail.id === view.selectedMail) button.classList.add("is-active");
-    const top = el("span", "mail-top");
-    top.append(el("span", "mail-subject", mail.subject), el("span", "mail-time", formatTime(mail.received_at)));
-    button.append(top, el("span", "mail-from", mail.sender));
+    const { severity, title } = splitSubject(mail.subject);
+    button.append(
+      el("span", `alert-severity sev-${severity}`, SEVERITY_NAMES[severity] || severity),
+      el("span", "mail-subject", title),
+      el("span", "mail-time", formatTime(mail.received_at)),
+    );
     button.addEventListener("click", () => {
       showMail(mail);
       for (const row of document.querySelectorAll(".mail-row")) row.classList.remove("is-active");
@@ -906,7 +909,7 @@ async function refreshInbox() {
 
 async function runCommand(command, button) {
   const target = $("diag-target").value;
-  for (const other of document.querySelectorAll(".command-btn")) other.classList.remove("is-active");
+  for (const other of $("diag-buttons").querySelectorAll(".btn")) other.classList.remove("is-active");
   button.classList.add("is-active");
   $("terminal-title").textContent = command.label;
   $("terminal-meta").textContent = "running";
@@ -937,16 +940,14 @@ async function loadDiagnostics() {
     option.value = entry.ip;
     target.appendChild(option);
   }
-  const items = options.commands.map((command) => {
-    const item = el("li");
-    const button = el("button", "command-btn");
+  const buttons = options.commands.map((command) => {
+    const button = el("button", "btn", command.label.replace(" (SOC Monitor ports)", ""));
     button.type = "button";
-    button.append(el("span", "action-name", command.label), el("span", "action-desc", command.summary));
+    button.title = command.summary;
     button.addEventListener("click", () => runCommand(command, button));
-    item.appendChild(button);
-    return item;
+    return button;
   });
-  $("diag-buttons").replaceChildren(...items);
+  $("diag-buttons").replaceChildren(...buttons);
   view.diagnosticsLoaded = true;
 }
 
@@ -965,13 +966,18 @@ async function refreshTab() {
     if (view.tab === "emails") await refreshInbox();
     if (view.tab === "diagnostics" && !view.diagnosticsLoaded) await loadDiagnostics();
   } catch (error) {
-    // The status pill already shows when the server is unreachable.
+    // A failed request is already shown by the status cell; anything else is a bug.
+    if (!isNetworkError(error)) console.error(error);
   }
 }
 
 async function poll() {
-  await refreshStatus();
-  await refreshTab();
+  try {
+    await refreshStatus();
+    await refreshTab();
+  } catch (error) {
+    console.error(error); // keep polling, but never hide a bug
+  }
   setTimeout(poll, POLL_MS);
 }
 
@@ -982,7 +988,7 @@ initChartHover();
 initTopology();
 initControls();
 initReports();
-holdWhileHovered($("event-list"), "pointerOnEvents");
+holdWhileHovered($("event-table"), "pointerOnEvents");
 holdWhileHovered($("inbox"), "pointerOnInbox");
 window.addEventListener("resize", () => view.status && drawQosChart(view.status.qos.timeline));
 setInterval(renderFreshness, 1000);

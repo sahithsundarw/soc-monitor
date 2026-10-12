@@ -43,15 +43,22 @@ class PageTest(DashboardTestCase):
     def test_index_shows_title_and_tabs(self) -> None:
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
-        for text in (b"SOC Monitor", b"Packet Inspector", b"Route from S1"):
+        for text in (b"SOC Monitor", b"Packet Inspector", b"Route from"):
             self.assertIn(text, response.data)
 
     def test_static_files_are_local(self) -> None:
-        for path in ("/static/style.css", "/static/app.js"):
+        fonts = [
+            f"/static/fonts/ibm-plex-{family}-latin-{weight}-normal.woff2"
+            for family in ("sans", "mono")
+            for weight in (400, 600)
+        ]
+        for path in ("/static/style.css", "/static/app.js", *fonts):
             response = self.client.get(path)
-            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.status_code, 200, path)
             response.close()
-        self.assertNotIn(b"http", self.client.get("/").data.split(b"<body>")[0])
+        page = self.client.get("/").data
+        self.assertNotIn(b"http://", page)
+        self.assertNotIn(b"https://", page)
 
 
 class StatusApiTest(DashboardTestCase):

@@ -56,11 +56,11 @@ A small Security Operations Center (SOC) system. Simulated sensors (firewall, ID
 This project must look and feel clean and professional, like a real product, not a student demo.
 
 Frontend:
-- Minimal, modern design: generous whitespace, consistent spacing (8px grid), rounded corners (8–12px), soft shadows, no clutter.
-- One UI font (system stack: -apple-system, Segoe UI, Roboto, sans-serif) and a monospace font only for frames, hex/binary and logs.
-- Restrained palette: neutral greys for layout, one accent colour (blue) for interactive elements, and severity colours used ONLY for alerts (CRITICAL red, HIGH orange, MEDIUM amber, LOW blue). Light and dark mode with a toggle, built on CSS variables.
-- Layout: fixed left sidebar for navigation, a top bar with the project name, system status (running/stopped) and live counters, and content arranged in a card grid.
-- Each card has a short title and its content, nothing extra. Key numbers as large stat tiles. Tables with zebra rows and clear headers.
+- Minimal "operations console" design: spacing 4/8/16/24/32 only, 8px radius everywhere, panels separated by 1px lines (no drop shadows; only the toast and chart tooltip float), no clutter.
+- IBM Plex Sans (400/600) for the UI and IBM Plex Mono for addresses, frames, hex/binary and logs, self-hosted as woff2 in static/fonts (OFL, works offline).
+- Restrained palette: neutral greys for layout, one accent colour (blue) for interaction, selection, the active route and the main chart series, and severity colours used ONLY for alerts, as text (CRITICAL red, HIGH orange, MEDIUM amber, LOW steel blue). Every text colour >= 4.5:1. Light and dark mode with a toggle, built on CSS variables.
+- Layout: full-width top bar with the project name, page title, system status (running/stopped) and live counters; fixed left sidebar for navigation; content in a grid of bordered panels.
+- Each panel has a short title and its content, nothing extra (no captions, taglines, icons or eyebrow labels). Key numbers in one stat strip. Tables with zebra rows and clear headers. Encode each fact once.
 - Subtle interaction only: hover states on buttons, a short fade when new alerts arrive, a gentle pulse on the active route in the topology. No flashy effects.
 - Empty and loading states for every panel (e.g. "No alerts yet").
 - Readable on a classroom projector: minimum 14px body text, good contrast.
