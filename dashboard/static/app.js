@@ -318,9 +318,14 @@ function chartGeometry(canvas, count) {
   return { width, height, left, top, bottom, plotHeight: bottom - top, slot: (width - left) / count };
 }
 
+// The axis never drops below 10 frames/s, so routine traffic sits low and a
+// flood visibly spikes instead of every second filling the plot.
+const CHART_MIN_TOP = 10;
+
 function niceTop(peak) {
   const step = peak <= 10 ? 2 : peak <= 50 ? 10 : peak <= 200 ? 50 : 100;
-  return Math.max(step * 2, Math.ceil(peak / (2 * step)) * 2 * step); // even, so the midline is whole
+  const top = Math.ceil(peak / (2 * step)) * 2 * step; // even, so the midline is whole
+  return Math.max(CHART_MIN_TOP, top);
 }
 
 function fillBar(ctx, x, y, width, height, roundTop) {
@@ -372,9 +377,9 @@ function drawQosChart(timeline) {
 
   const accent = cssVar("--series-primary");
   const neutral = cssVar("--neutral-series");
-  const barWidth = Math.max(1, geo.slot - 2);
+  const barWidth = Math.max(1, Math.round(geo.slot * 0.6));
   timeline.forEach((second, index) => {
-    const x = geo.left + index * geo.slot + 1;
+    const x = geo.left + index * geo.slot + (geo.slot - barWidth) / 2;
     const allowedHeight = (second.allowed / top) * geo.plotHeight;
     const droppedHeight = (second.dropped / top) * geo.plotHeight;
     ctx.fillStyle = accent;
