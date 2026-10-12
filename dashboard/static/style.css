@@ -627,12 +627,10 @@ output {
 
 .split-udp {
   background: var(--series-primary);
-  transition: width 400ms ease;
 }
 
 .split-tcp {
   background: var(--neutral-series);
-  transition: width 400ms ease;
 }
 
 /* ---------- Tables ---------- */
@@ -1273,10 +1271,6 @@ output {
   .alert-item.is-new,
   .toast {
     animation: none;
-  }
-  .split-udp,
-  .split-tcp {
-    transition: none;
   }
 }
 
