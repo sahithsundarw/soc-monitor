@@ -1327,3 +1327,104 @@ output {
     max-height: 320px;
   }
 }
+
+/* Phones: the sidebar becomes a scrolling tab row under the top bar, and every
+   multi-column block collapses to one column, so nothing scrolls sideways. */
+@media (max-width: 720px) {
+  :root {
+    --nav-height: 48px;
+  }
+  .topbar {
+    padding: 0 16px;
+  }
+  .page-title {
+    display: none; /* the active tab in the tab row already names the page */
+  }
+  .sidebar {
+    top: var(--topbar-height);
+    bottom: auto;
+    right: 0;
+    width: auto;
+    height: var(--nav-height);
+    padding: 8px 16px;
+    flex-direction: row;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+  .nav {
+    flex-direction: row;
+  }
+  .nav-item {
+    flex: none;
+    white-space: nowrap;
+  }
+  .nav-count {
+    margin-left: 8px;
+  }
+  .sidebar-foot {
+    display: none; /* the same settings are on the Controls tab */
+  }
+  .content {
+    margin-left: 0;
+    padding: calc(var(--topbar-height) + var(--nav-height) + 16px) 16px 24px;
+  }
+  .stat {
+    flex-basis: 50%;
+  }
+  .segmented {
+    flex-wrap: nowrap;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+  .segmented button {
+    flex: none;
+  }
+  .route-control,
+  .head-actions,
+  .inline-kv {
+    flex-wrap: wrap;
+  }
+  .alert-item {
+    grid-template-columns: auto 1fr;
+    gap: 4px 16px;
+  }
+  .alert-item > div {
+    grid-column: 1 / -1;
+  }
+  .form-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .kv {
+    grid-template-columns: 112px 1fr;
+  }
+  .split {
+    flex-wrap: wrap;
+    gap: 8px 16px;
+  }
+  .panel > .table {
+    display: block;
+    overflow-x: auto;
+  }
+  .action-table tr {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    height: auto;
+    padding: 8px 0;
+  }
+  .action-table th,
+  .action-table td {
+    height: auto;
+  }
+  .action-table td:nth-child(2) {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .action-table td:last-child {
+    grid-column: 2;
+    grid-row: 1;
+  }
+}
