@@ -62,9 +62,17 @@ function ServerFacts({ items }: { items: [string, string][] }) {
   )
 }
 
-export function ReportsTab({ ftpAddress }: { ftpAddress: string | undefined }) {
-  const poll = usePoll<ReportFile[]>("/api/reports", SLOW_POLL_MS)
-  const { pending, run } = useAction()
+export function ReportsTab({
+  active,
+  ftpAddress,
+}: {
+  active: boolean
+  ftpAddress: string | undefined
+}) {
+  const poll = usePoll<ReportFile[]>("/api/reports", SLOW_POLL_MS, {
+    enabled: active,
+  })
+  const { busy, run } = useAction()
   const files = poll.data
 
   const generate = async () => {
@@ -81,8 +89,8 @@ export function ReportsTab({ ftpAddress }: { ftpAddress: string | undefined }) {
       <PageHeader
         title="Reports"
         actions={
-          <Button onClick={generate} disabled={pending !== null}>
-            {pending ? (
+          <Button onClick={generate} disabled={busy}>
+            {busy ? (
               <Spinner data-icon="inline-start" />
             ) : (
               <UploadIcon data-icon="inline-start" />

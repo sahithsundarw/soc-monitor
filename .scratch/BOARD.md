@@ -13,6 +13,7 @@ Branch: `build/phases-2-7` (main untouched). One commit per phase.
 
 ## In Review
 - Dashboard rebuilt with React + shadcn/ui on branch `ui/shadcn` (from `ui/polish`), restyled after shadcndesign `dashboard-1`, light mode only. All 7 tabs keep their content and behaviour; API unchanged apart from a new `GET /api/meta`. Python 158/158, Vitest 23/23, tsc + eslint + build clean, all 7 demo steps clicked through in Playwright (1440px and 390px).
+- Review fixes (follow-up to d9cd27f, not yet committed): tabs stay mounted so terminal output, inspector selection and filters survive tab switches, and only the shown tab polls; polling survives StrictMode and pauses while hidden; concurrent actions track their own pending state; slider value held until the status poll catches up; alerts that arrive while Overview is hidden fade in when it is shown. Python 158/158, Vitest 32/32, tsc + eslint + build clean. Checked in Playwright: a brute force launched from Controls fades in on Overview while older alerts don't; console clean.
 
 ## Blocked
 - none

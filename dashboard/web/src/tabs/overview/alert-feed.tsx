@@ -15,6 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { useNewKeys } from "@/hooks/use-new-keys"
 import { formatNumber, formatTime, SEVERITY_NAMES, sum } from "@/lib/format"
 import { SEVERITIES, type Alert, type Severity } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -71,10 +72,10 @@ function SeverityFilter({
 
 function AlertTable({
   alerts,
-  openedAt,
+  fresh,
 }: {
   alerts: Alert[]
-  openedAt: number
+  fresh: ReadonlySet<string>
 }) {
   return (
     <ScrollArea className="[&>[data-slot=scroll-area-viewport]]:max-h-[26rem]">
@@ -90,9 +91,8 @@ function AlertTable({
           {alerts.map((alert) => (
             <TableRow
               key={alertKey(alert)}
-              // Only alerts raised after the page opened fade in; the backlog just appears.
               className={cn(
-                alert.ts > openedAt && "animate-in duration-700 fade-in"
+                fresh.has(alertKey(alert)) && "animate-in duration-700 fade-in"
               )}
             >
               <TableCell className="align-top font-mono text-muted-foreground tabular-nums max-sm:hidden">
@@ -121,14 +121,17 @@ function AlertTable({
 export function AlertFeed({
   alerts,
   counts,
+  visible = true,
   className,
 }: {
   alerts: Alert[] | undefined
   counts: Record<Severity, number> | undefined
+  visible?: boolean
   className?: string
 }) {
   const [filter, setFilter] = useState<Filter>("ALL")
-  const [openedAt] = useState(() => Date.now() / 1000)
+  // Alerts not seen before on this page fade in; the backlog just appears.
+  const fresh = useNewKeys(alerts?.map(alertKey), visible)
   const shown = alerts ? filterAlerts(alerts, filter) : []
 
   return (
@@ -161,7 +164,7 @@ export function AlertFeed({
             }
           />
         ) : (
-          <AlertTable alerts={shown} openedAt={openedAt} />
+          <AlertTable alerts={shown} fresh={fresh} />
         )}
       </Panel>
     </Section>

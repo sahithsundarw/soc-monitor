@@ -30,7 +30,7 @@ function LinksTable({
   links: Link[]
   onChanged: () => void
 }) {
-  const { pending, run } = useAction()
+  const { pending, busy, run } = useAction()
 
   const toggle = async (link: Link) => {
     const action = link.up ? "fail" : "restore"
@@ -78,11 +78,11 @@ function LinksTable({
               <TableCell className="py-2 text-right">
                 <Button
                   variant={link.up ? "outline" : "default"}
-                  disabled={pending !== null}
+                  disabled={busy}
                   onClick={() => toggle(link)}
                   aria-label={`${verb} link ${key}`}
                 >
-                  {pending === key && <Spinner data-icon="inline-start" />}
+                  {pending.has(key) && <Spinner data-icon="inline-start" />}
                   {verb}
                 </Button>
               </TableCell>
@@ -163,8 +163,14 @@ function RoutePicker({
   )
 }
 
-export function TopologyTab({ sensors }: { sensors: string[] }) {
-  const poll = usePoll<Topology>("/api/topology", POLL_MS)
+export function TopologyTab({
+  active,
+  sensors,
+}: {
+  active: boolean
+  sensors: string[]
+}) {
+  const poll = usePoll<Topology>("/api/topology", POLL_MS, { enabled: active })
   const [sensor, setSensor] = useState("S1")
   const topology = poll.data
   const route = topology?.routes[sensor] ?? { path: [], cost: null }

@@ -46,6 +46,16 @@ describe("AlertFeed", () => {
     expect(screen.getByText("No critical alerts")).toBeInTheDocument()
   })
 
+  it("fades in only alerts that arrive after the first list", () => {
+    const { rerender } = render(<AlertFeed alerts={alerts} counts={counts} />)
+    const rowOf = (title: string) => screen.getByText(title).closest("tr")
+    expect(rowOf("Brute-force login")).not.toHaveClass("animate-in")
+    const newer = alert("CRITICAL", "Malware C2 beacon", 1_700_000_005)
+    rerender(<AlertFeed alerts={[newer, ...alerts]} counts={counts} />)
+    expect(rowOf("Malware C2 beacon")).toHaveClass("animate-in")
+    expect(rowOf("Brute-force login")).not.toHaveClass("animate-in")
+  })
+
   it("shows the empty state before any alert", () => {
     render(
       <AlertFeed

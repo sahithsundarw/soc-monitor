@@ -6,7 +6,13 @@ import { SensorTable } from "@/tabs/overview/sensor-table"
 import { StatStrip } from "@/tabs/overview/stat-strip"
 import { TokenBucketChart } from "@/tabs/overview/token-bucket-chart"
 
-export function OverviewTab({ status }: { status: Status | undefined }) {
+export function OverviewTab({
+  status,
+  active,
+}: {
+  status: Status | undefined
+  active: boolean
+}) {
   return (
     <>
       <PageHeader title="Overview" />
@@ -17,12 +23,16 @@ export function OverviewTab({ status }: { status: Status | undefined }) {
           <AlertFeed
             alerts={status?.alerts}
             counts={status?.severity_counts}
+            visible={active}
             className="xl:col-span-3"
           />
-          <TokenBucketChart
-            timeline={status?.qos.timeline}
-            className="xl:col-span-2"
-          />
+          {/* A hidden chart has no size to draw in, so it is drawn only when shown. */}
+          {active && (
+            <TokenBucketChart
+              timeline={status?.qos.timeline}
+              className="xl:col-span-2"
+            />
+          )}
         </div>
         <Separator />
         <SensorTable status={status} />

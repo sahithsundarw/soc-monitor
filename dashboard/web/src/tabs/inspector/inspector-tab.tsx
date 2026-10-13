@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { InboxIcon, MousePointerClickIcon } from "lucide-react"
+import { FileXIcon, InboxIcon, MousePointerClickIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import { PageBody, PageHeader, Panel, Section } from "@/components/page"
@@ -79,21 +79,53 @@ function EventTable({
   )
 }
 
-export function InspectorTab() {
-  const poll = usePoll<EventSummary[]>("/api/events", POLL_MS)
+export function InspectorTab({ active }: { active: boolean }) {
+  const poll = usePoll<EventSummary[]>("/api/events", POLL_MS, {
+    enabled: active,
+  })
   const [selected, setSelected] = useState<string | null>(null)
   const [layers, setLayers] = useState<Layers | null>(null)
+  const [failure, setFailure] = useState<{
+    id: string
+    message: string
+  } | null>(null)
 
   useEffect(() => {
     if (!selected) return
     let current = true
     api<Layers>(`/api/events/${encodeURIComponent(selected)}`)
       .then((next) => current && setLayers(next))
-      .catch((error: Error) => current && toast.error(error.message))
+      .catch((error: Error) => {
+        if (!current) return
+        setFailure({ id: selected, message: error.message })
+        toast.error(error.message)
+      })
     return () => {
       current = false
     }
   }, [selected])
+
+  const frame = !selected ? (
+    <PanelEmpty
+      icon={MousePointerClickIcon}
+      title="No event selected"
+      description="Select an event to see it at every layer."
+    />
+  ) : failure?.id === selected ? (
+    <PanelEmpty
+      icon={FileXIcon}
+      title="Frame not available"
+      description={failure.message}
+    />
+  ) : layers?.id !== selected ? (
+    <div className="flex flex-col gap-4" aria-label="Loading frame">
+      <Skeleton className="h-32 w-full" />
+      <Skeleton className="h-24 w-full" />
+      <Skeleton className="h-24 w-full" />
+    </div>
+  ) : (
+    <LayerStack layers={layers} />
+  )
 
   return (
     <>
@@ -130,24 +162,14 @@ export function InspectorTab() {
             title="Frame"
             className="lg:col-span-7"
             actions={
-              layers && (
+              selected && (
                 <span className="font-mono text-sm text-muted-foreground">
-                  {layers.id}
+                  {selected}
                 </span>
               )
             }
           >
-            <Panel className="p-4 md:p-6">
-              {layers ? (
-                <LayerStack layers={layers} />
-              ) : (
-                <PanelEmpty
-                  icon={MousePointerClickIcon}
-                  title="No event selected"
-                  description="Select an event to see it at every layer."
-                />
-              )}
-            </Panel>
+            <Panel className="p-4 md:p-6">{frame}</Panel>
           </Section>
         </div>
       </PageBody>

@@ -12,53 +12,78 @@ export type Poll<T> = {
   refresh: () => Promise<boolean>
 }
 
+type Options = {
+  /** Stop after the first success (lists that never change during the demo). */
+  once?: boolean
+  /** Poll only while true, e.g. while the tab is visible; data is kept. */
+  enabled?: boolean
+}
+
 /**
  * GET `path` now and then every `intervalMs` (plain HTTP polling, no
  * websockets). The next request starts only after the previous one finished,
- * so a slow server never piles requests up. With `once`, polling stops after
- * the first success (for lists that never change while the demo runs).
+ * so a slow server never piles requests up.
  */
 export function usePoll<T>(
   path: string,
   intervalMs: number,
-  { once = false }: { once?: boolean } = {}
+  { once = false, enabled = true }: Options = {}
 ): Poll<T> {
   const [data, setData] = useState<T>()
   const [error, setError] = useState<string | null>(null)
   const [lastUpdate, setLastUpdate] = useState(0)
-  const alive = useRef(true)
-
-  const refresh = useCallback(async () => {
-    try {
-      const next = await api<T>(path)
-      if (!alive.current) return false
-      setData(next)
-      setError(null)
-      setLastUpdate(Date.now())
-      return true
-    } catch (failure) {
-      if (alive.current) {
-        setError(failure instanceof Error ? failure.message : String(failure))
-      }
-      return false
-    }
-  }, [path])
+  // Guards manual refresh() calls that finish after the component unmounted.
+  const mounted = useRef(true)
 
   useEffect(() => {
-    alive.current = true
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
+
+  const fetchOnce = useCallback(
+    async (isLive: () => boolean) => {
+      try {
+        const next = await api<T>(path)
+        if (!isLive()) return false
+        setData(next)
+        setError(null)
+        setLastUpdate(Date.now())
+        return true
+      } catch (failure) {
+        if (isLive()) {
+          setError(failure instanceof Error ? failure.message : String(failure))
+        }
+        return false
+      }
+    },
+    [path]
+  )
+
+  const refresh = useCallback(
+    () => fetchOnce(() => mounted.current),
+    [fetchOnce]
+  )
+
+  useEffect(() => {
+    if (!enabled) return
+    // Each run of this effect owns its own loop, so a cleanup (StrictMode,
+    // or the tab being hidden) always stops exactly that loop.
+    let cancelled = false
     let timer: ReturnType<typeof setTimeout> | undefined
     const tick = async () => {
-      const succeeded = await refresh()
-      if (alive.current && !(once && succeeded)) {
+      const succeeded = await fetchOnce(() => !cancelled)
+      if (!cancelled && !(once && succeeded)) {
         timer = setTimeout(tick, intervalMs)
       }
     }
     tick()
     return () => {
-      alive.current = false
+      cancelled = true
       clearTimeout(timer)
     }
-  }, [refresh, intervalMs, once])
+  }, [fetchOnce, intervalMs, once, enabled])
 
   return { data, error, lastUpdate, refresh }
 }

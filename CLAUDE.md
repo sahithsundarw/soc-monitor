@@ -14,7 +14,7 @@
 - React 19 + Vite + Tailwind v4 + shadcn/ui (radix base, lucide icons) in `dashboard/web/`. Still offline: everything, including the Geist fonts (fontsource), is bundled.
 - Look follows shadcndesign's `dashboard-1` (Pro, not installed; recreated with free shadcn parts): light mode only, white page, breadcrumb top bar, big page title + actions (`components/page.tsx`), stat strip with dividers, sections instead of cards, tables in bordered panels, black primary.
 - Kept from the brief: severity colours only on alerts (Badge variants `critical|high|medium|low`), ≥14px text, mono for addresses/hex/timestamps. Palette tokens live in `src/index.css`.
-- Flask serves `static/dist/index.html` at `/`; fixed lists come from `GET /api/meta`. One tab is mounted at a time, so only its endpoints are polled.
+- Flask serves `static/dist/index.html` at `/`; fixed lists come from `GET /api/meta`. Every tab stays mounted (hidden with `hidden`, so state survives tab switches), but a tab polls its endpoints only while it is shown (`usePoll(..., { enabled: active })`).
 
 ## Config
 - `config_loader.load_config()` is the single way to read `config.json`.

@@ -82,8 +82,8 @@ function Reader({ mail }: { mail: Email }) {
   )
 }
 
-export function EmailsTab() {
-  const poll = usePoll<Email[]>("/api/emails", POLL_MS)
+export function EmailsTab({ active }: { active: boolean }) {
+  const poll = usePoll<Email[]>("/api/emails", POLL_MS, { enabled: active })
   const [selected, setSelected] = useState<Email | null>(null)
 
   return (

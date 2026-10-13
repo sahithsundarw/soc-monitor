@@ -29,21 +29,16 @@ const ATTACK_NAMES: Record<string, string> = {
   beacon: "Malware beacon",
 }
 
-type Run = ReturnType<typeof useAction>["run"]
-
 function LinkLayerCard({
   settings,
   meta,
-  run,
-  pending,
   onChanged,
 }: {
   settings: LinkSettings | undefined
   meta: Meta | undefined
-  run: Run
-  pending: string | null
-  onChanged: () => void
+  onChanged: () => Promise<unknown>
 }) {
+  const { pending, run } = useAction()
   // An unapplied slider value is never overwritten by the poll.
   const [edited, setEdited] = useState<number | null>(null)
   const noise = edited ?? Math.round((settings?.error_rate ?? 0) * 100)
@@ -55,8 +50,9 @@ function LinkLayerCard({
       `Line noise set to ${noise}% per link`
     )
     if (done) {
+      // Let the status poll catch up first, so the slider never jumps back.
+      await onChanged()
       setEdited(null)
-      onChanged()
     }
   }
 
@@ -97,9 +93,9 @@ function LinkLayerCard({
               </output>
               <Button
                 onClick={applyNoise}
-                disabled={!settings || pending === "noise"}
+                disabled={!settings || pending.has("noise")}
               >
-                {pending === "noise" && <Spinner data-icon="inline-start" />}
+                {pending.has("noise") && <Spinner data-icon="inline-start" />}
                 Apply
               </Button>
             </div>
@@ -113,7 +109,7 @@ function LinkLayerCard({
               value={settings?.method ?? ""}
               onValueChange={(value: string) => change("method", value)}
               aria-labelledby="framing-label"
-              disabled={!settings || pending === "method"}
+              disabled={!settings || pending.has("method")}
             >
               {(meta?.methods ?? []).map((method) => (
                 <ToggleGroupItem key={method} value={method}>
@@ -131,7 +127,7 @@ function LinkLayerCard({
               value={settings?.crc_type ?? ""}
               onValueChange={(value: string) => change("crc_type", value)}
               aria-labelledby="crc-label"
-              disabled={!settings || pending === "crc_type"}
+              disabled={!settings || pending.has("crc_type")}
             >
               {(meta?.crc_types ?? []).map((crc) => (
                 <ToggleGroupItem key={crc} value={crc} className="font-mono">
@@ -168,15 +164,8 @@ function ActionRow({
   )
 }
 
-function TrafficCard({
-  sensors,
-  run,
-  pending,
-}: {
-  sensors: string[]
-  run: Run
-  pending: string | null
-}) {
+function TrafficCard({ sensors }: { sensors: string[] }) {
+  const { pending, busy, run } = useAction()
   const [floodSensor, setFloodSensor] = useState("S1")
 
   const button = (
@@ -187,11 +176,11 @@ function TrafficCard({
   ) => (
     <Button
       variant="outline"
-      disabled={pending !== null}
+      disabled={busy}
       aria-label={ariaLabel}
       onClick={onClick}
     >
-      {pending === key && <Spinner data-icon="inline-start" />}
+      {pending.has(key) && <Spinner data-icon="inline-start" />}
       {label}
     </Button>
   )
@@ -308,9 +297,8 @@ export function ControlsTab({
 }: {
   settings: LinkSettings | undefined
   meta: Meta | undefined
-  onChanged: () => void
+  onChanged: () => Promise<unknown>
 }) {
-  const { pending, run } = useAction()
   return (
     <>
       <PageHeader title="Controls" />
@@ -319,15 +307,9 @@ export function ControlsTab({
           <LinkLayerCard
             settings={settings}
             meta={meta}
-            run={run}
-            pending={pending}
             onChanged={onChanged}
           />
-          <TrafficCard
-            sensors={meta?.sensors ?? []}
-            run={run}
-            pending={pending}
-          />
+          <TrafficCard sensors={meta?.sensors ?? []} />
         </div>
       </PageBody>
     </>

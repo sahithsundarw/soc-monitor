@@ -48,11 +48,14 @@ async function timed<T>(
   return { result, seconds: ((performance.now() - started) / 1000).toFixed(1) }
 }
 
-export function DiagnosticsTab() {
-  const options = usePoll<Diagnostics>("/api/diagnostics", 2000, { once: true })
+export function DiagnosticsTab({ active }: { active: boolean }) {
+  const options = usePoll<Diagnostics>("/api/diagnostics", 2000, {
+    once: true,
+    enabled: active,
+  })
   const [target, setTarget] = useState<string>()
   const [terminal, setTerminal] = useState<Terminal>(IDLE)
-  const { pending, run } = useAction()
+  const { pending, busy, run } = useAction()
   const chosenTarget = target ?? options.data?.targets[0]?.ip ?? ""
 
   const runCommand = async (command: DiagnosticCommand) => {
@@ -120,10 +123,10 @@ export function DiagnosticsTab() {
                     <TooltipTrigger asChild>
                       <Button
                         variant="outline"
-                        disabled={pending !== null}
+                        disabled={busy}
                         onClick={() => runCommand(command)}
                       >
-                        {pending === command.id && (
+                        {pending.has(command.id) && (
                           <Spinner data-icon="inline-start" />
                         )}
                         {shortLabel(command)}

@@ -80,6 +80,32 @@ describe("usePoll", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
+  it("runs one loop under StrictMode's mount, unmount, mount", async () => {
+    fetchMock.mockImplementation(() => reply({ data: 1, error: null }))
+    renderHook(() => usePoll("/api/status", 1000), { reactStrictMode: true })
+    await advance(0)
+    const afterMount = fetchMock.mock.calls.length
+    await advance(3000)
+    // Exactly one request per second after the initial one(s).
+    expect(fetchMock.mock.calls.length - afterMount).toBe(3)
+  })
+
+  it("pauses while disabled and fetches right away when enabled again", async () => {
+    fetchMock.mockImplementation(() => reply({ data: 1, error: null }))
+    const { rerender } = renderHook(
+      ({ enabled }) => usePoll("/api/topology", 1000, { enabled }),
+      { initialProps: { enabled: false } }
+    )
+    await advance(3000)
+    expect(fetchMock).not.toHaveBeenCalled()
+    rerender({ enabled: true })
+    await advance(0)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    rerender({ enabled: false })
+    await advance(3000)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
   it("stops polling when unmounted", async () => {
     fetchMock.mockImplementation(() => reply({ data: 1, error: null }))
     const { unmount } = renderHook(() => usePoll("/api/events", 1000))
