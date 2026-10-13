@@ -14,8 +14,9 @@ to a central SOC collector. Along the way the project demonstrates:
 - **Application services**: alert emails over SMTP, daily reports over FTP, and ping,
   traceroute, netstat, ipconfig and arp diagnostics.
 
-Everything is shown on a live web dashboard built with plain HTML, CSS and JavaScript.
-It works offline: no CDN and no frontend libraries.
+Everything is shown on a live web dashboard built with React, Tailwind CSS and
+shadcn/ui. The built dashboard is committed and served by Flask, so the lab PCs need
+only Python. It works offline: no CDN, and the fonts are self-hosted.
 
 ## Architecture
 
@@ -61,6 +62,20 @@ uv pip install -r requirements.txt
 
 Without `uv`, `python -m venv .venv` and `pip install -r requirements.txt` work too.
 
+### Changing the dashboard (optional, needs Node.js 22+)
+
+The dashboard source is in `dashboard/web/` (React 19, Vite, Tailwind CSS v4,
+shadcn/ui). Its production build lives in `dashboard/static/dist/` and is committed, so
+running the demo never needs Node. After changing the source:
+
+```powershell
+cd dashboard/web
+npm install
+npm run dev       # live-reloading dashboard on :5173, talking to a running run_demo.py
+npm test          # component tests (Vitest + Testing Library)
+npm run build     # type-check and rebuild dashboard/static/dist; commit the result
+```
+
 ## Running on one PC
 
 ```powershell
@@ -105,7 +120,7 @@ encoding frames the same way. Two things stay on the sensors' PC:
 |---|---|---|---|
 | 1 | Topology | Start `run_demo.py` and open the dashboard. | Events flow. The route S1 > R2 > SOC is highlighted. |
 | 2 | Controls | Click **Launch brute force**. | A HIGH "Brute-force login" alert on Overview, and an email in **Emails**. |
-| 3 | Controls | Set noise to 15% and click **Apply noise**. | Corrupted frames and retransmissions climb, and a "Link tampering or noise" alert appears. Set noise back to 0%. |
+| 3 | Controls | Set noise to 15% and click **Apply**. | Corrupted frames and retransmissions climb, and a "Link tampering or noise" alert appears. Set noise back to 0%. |
 | 4 | Topology | Click **Fail link** on R2 - SOC. | Dijkstra reroutes S1 over R2 > R4 > SOC, and the highlight moves. Click **Restore link**. |
 | 5 | Controls | Click **Flood from sensor** (S1), then **Send from unknown IP**. | The token bucket chart shows drops and a HIGH "Flooding" alert. Firewall blocks rise and a LOW "Firewall block" alert names 203.0.113.66. |
 | 6 | Reports | Click **Generate & upload report**. | Today's `.txt` and `.csv` appear in the FTP file list. |
@@ -125,10 +140,11 @@ part on the console.
 python -m unittest discover -s tests -v
 ```
 
-The 148 tests cover every module: stuffing round trips, CRC detection, ARQ with a
+The 158 tests cover every module: stuffing round trips, CRC detection, ARQ with a
 scripted fake link, detector thresholds, firewall order, token bucket, the dashboard
-API, FTP upload, SMTP delivery, and end-to-end runs over real sockets on shifted ports,
-so a running demo is not disturbed.
+API and its offline build, FTP upload, SMTP delivery, and end-to-end runs over real
+sockets on shifted ports, so a running demo is not disturbed. The dashboard's own
+component tests run with `npm test` in `dashboard/web/`.
 
 ## Experiment results
 
@@ -157,7 +173,8 @@ soc-monitor/
   soc/                   events.py, sensor.py, collector.py, detector.py,
                          firewall.py, qos.py (token bucket), state.py, system.py
   services/              ftp_archive.py, mailer.py, diagnostics.py
-  dashboard/             app.py (JSON API), inspector.py, templates/, static/
+  dashboard/             app.py (JSON API), inspector.py,
+                         web/ (React + shadcn/ui source), static/dist/ (its build)
   tests/                 unittest suite
   results/               experiment CSVs
   logs/ reports/ ftp_root/   created at run time
@@ -175,7 +192,7 @@ Dijkstra modules are therefore clean textbook-style implementations (Forouzan).
 | Overview: stat tiles, live alerts, token bucket chart | Topology: R2-SOC failed, route moved to R2 > R4 > SOC |
 | ![Controls](docs/screenshots/controls.png) | ![Packet Inspector](docs/screenshots/packet-inspector.png) |
 | Controls: noise, link layer, attacks, flooding | Packet Inspector: one event at every layer |
-| ![Emails in dark mode](docs/screenshots/emails-dark.png) | ![Diagnostics in dark mode](docs/screenshots/diagnostics-dark.png) |
-| Emails (dark mode): alert inbox | Diagnostics (dark mode): netstat of the SOC ports |
+| ![Emails](docs/screenshots/emails.png) | ![Diagnostics](docs/screenshots/diagnostics.png) |
+| Emails: alert inbox | Diagnostics: netstat of the SOC ports |
 | ![Reports](docs/screenshots/reports.png) | |
 | Reports: files on the FTP server | |

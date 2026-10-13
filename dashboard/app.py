@@ -9,9 +9,10 @@ import ftplib
 import logging
 import threading
 import time
+from pathlib import Path
 from typing import Any
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, request, send_from_directory
 from flask.typing import ResponseReturnValue
 from werkzeug.serving import make_server
 
@@ -35,6 +36,8 @@ FLOOD_FRAMES = 150
 SPOOF_FRAMES = 10
 SPOOF_IP = "203.0.113.66"
 RECENT_ALERTS = 30
+# The React dashboard's production build (source in dashboard/web).
+BUILD_DIR = Path(__file__).resolve().parent / "static" / "dist"
 
 # Where each node is drawn on the topology diagram (an 800 x 420 canvas).
 NODE_POSITIONS = {
@@ -327,21 +330,33 @@ def register_service_api(app: Flask, system: SocSystem) -> None:
         return ok(result)
 
 
+def meta_payload(system: SocSystem) -> dict[str, Any]:
+    """Fixed facts the dashboard needs once: sensors, link options, FTP address."""
+    ftp = system.config["services"]["ftp"]
+    return {
+        "sensors": system.sensor_ids,
+        "methods": list(FRAMING_METHODS),
+        "crc_types": list(CRC_POLYNOMIALS),
+        "ftp_address": f"{ftp['host']}:{ftp['port']}",
+    }
+
+
 def create_app(system: SocSystem) -> Flask:
     """Build the Flask application for a (started or stopped) SOC system."""
     app = Flask(__name__)
 
     @app.get("/")
-    def index() -> str:
-        """Serve the single-page dashboard."""
-        ftp = system.config["services"]["ftp"]
-        return render_template(
-            "index.html",
-            sensors=system.sensor_ids,
-            methods=FRAMING_METHODS,
-            crc_types=list(CRC_POLYNOMIALS),
-            ftp_address=f"{ftp['host']}:{ftp['port']}",
-        )
+    def index() -> ResponseReturnValue:
+        """Serve the single-page dashboard built by Vite (dashboard/web)."""
+        if not (BUILD_DIR / "index.html").is_file():
+            return fail(
+                "Dashboard not built: run `npm run build` in dashboard/web", 503
+            )
+        return send_from_directory(BUILD_DIR, "index.html")
+
+    @app.get("/api/meta")
+    def get_meta() -> ResponseReturnValue:
+        return ok(meta_payload(system))
 
     register_api(app, system)
     return app

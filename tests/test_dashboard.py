@@ -1,9 +1,12 @@
 """Tests for the Flask dashboard: page, JSON API and Packet Inspector."""
 
+import re
+import tempfile
 import unittest
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 from dashboard.app import create_app
 from dashboard.inspector import crc_hex, describe_layers
@@ -38,36 +41,79 @@ class DashboardTestCase(unittest.TestCase):
         return response.status_code, response.get_json()
 
 
-class PageTest(DashboardTestCase):
-    """The HTML page and its local static files."""
+BUILD_DIR = Path(__file__).resolve().parent.parent / "dashboard" / "static" / "dist"
 
-    def test_index_shows_title_and_tabs(self) -> None:
-        response = self.client.get("/")
-        self.assertEqual(response.status_code, 200)
-        for text in (b"SOC Monitor", b"Packet Inspector", b"Route from"):
-            self.assertIn(text, response.data)
+
+class PageTest(DashboardTestCase):
+    """The built single-page dashboard and its local static files."""
+
+    def fetch(self, path: str) -> tuple[int, bytes]:
+        """GET a page or file and close it (files are streamed from disk)."""
+        response = self.client.get(path)
+        try:
+            return response.status_code, response.data
+        finally:
+            response.close()
+
+    def page_assets(self) -> list[str]:
+        """Every script and stylesheet the built page loads."""
+        page = self.fetch("/")[1].decode("utf-8")
+        return re.findall(r'(?:src|href)="(/static/[^"]+)"', page)
+
+    def test_index_serves_the_built_dashboard(self) -> None:
+        status, page = self.fetch("/")
+        self.assertEqual(status, 200)
+        self.assertIn(b"<title>SOC Monitor</title>", page)
+        self.assertIn(b'<div id="root">', page)
+        assets = self.page_assets()
+        self.assertTrue(any(path.endswith(".js") for path in assets), assets)
+        self.assertTrue(any(path.endswith(".css") for path in assets), assets)
+
+    def stylesheet_urls(self) -> list[str]:
+        """Every url(...) (fonts) referenced by the built stylesheets."""
+        urls = []
+        for path in self.page_assets():
+            if path.endswith(".css"):
+                css = self.fetch(path)[1].decode("utf-8")
+                urls += re.findall(r"url\(\s*['\"]?([^'\")]+)", css)
+        return urls
 
     def test_static_files_are_local(self) -> None:
-        fonts = [
-            f"/static/fonts/ibm-plex-{family}-latin-{weight}-normal.woff2"
-            for family in ("sans", "mono")
-            for weight in (400, 600)
-        ]
-        for path in ("/static/style.css", "/static/app.js", *fonts):
-            response = self.client.get(path)
-            self.assertEqual(response.status_code, 200, path)
-            response.close()
-        page = self.client.get("/").data
+        fonts = [url for url in self.stylesheet_urls() if url.endswith(".woff2")]
+        self.assertTrue(fonts, "the stylesheet should bundle its own fonts")
+        for path in (*self.page_assets(), *fonts):
+            self.assertTrue(path.startswith("/static/"), path)
+            self.assertEqual(self.fetch(path)[0], 200, path)
+        page = self.fetch("/")[1]
         self.assertNotIn(b"http://", page)
         self.assertNotIn(b"https://", page)
 
+    def test_missing_build_says_how_to_build(self) -> None:
+        with tempfile.TemporaryDirectory() as empty:
+            with patch("dashboard.app.BUILD_DIR", Path(empty)):
+                response = self.client.get("/")
+        self.assertEqual(response.status_code, 503)
+        self.assertIn("npm run build", response.get_json()["error"])
+
+    def test_stylesheet_loads_nothing_remote(self) -> None:
+        for path in self.page_assets():
+            if path.endswith(".css"):
+                css = self.fetch(path)[1].decode("utf-8")
+                self.assertNotRegex(css, r"url\(\s*['\"]?(https?:)?//", path)
+                self.assertNotIn("@import", css, path)
+
 
 class EncodingTest(unittest.TestCase):
-    """Jinja and browsers read the frontend as UTF-8; a stray cp1252 byte breaks it."""
+    """Browsers read the frontend as UTF-8; a stray cp1252 byte breaks it."""
 
     def test_frontend_files_are_utf8(self) -> None:
-        root = Path(__file__).resolve().parent.parent / "dashboard"
-        for path in [*root.glob("templates/*.html"), *root.glob("static/*.*")]:
+        text_files = [
+            path
+            for path in BUILD_DIR.rglob("*")
+            if path.suffix in {".html", ".js", ".css"}
+        ]
+        self.assertTrue(text_files, "dashboard not built: run npm run build")
+        for path in text_files:
             with self.subTest(file=path.name):
                 path.read_bytes().decode("utf-8")
 
@@ -91,6 +137,14 @@ class StatusApiTest(DashboardTestCase):
         self.assertIsNone(data["uptime_s"])  # the test system is never started
         self.assertEqual(data["email_count"], 0)
         self.assertEqual(data["routes"]["S1"]["path"], ["S1", "R2", "SOC"])
+
+    def test_meta_lists_sensors_and_link_options(self) -> None:
+        data = self.get_data("/api/meta")
+        self.assertEqual(data["sensors"], ["S1", "S2", "S3"])
+        self.assertEqual(set(data["methods"]), {"character", "bit"})
+        self.assertEqual(set(data["crc_types"]), {"CRC-12", "CRC-16", "CRC-CCITT"})
+        ftp = self.system.config["services"]["ftp"]
+        self.assertEqual(data["ftp_address"], f"{ftp['host']}:{ftp['port']}")
 
     def test_topology_has_tables_for_every_router(self) -> None:
         data = self.get_data("/api/topology")

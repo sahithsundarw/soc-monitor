@@ -11,6 +11,9 @@ Branch: `build/phases-2-7` (main untouched). One commit per phase.
 - Phase 6: FTP reports, SMTP alert emails, whitelisted diagnostics (+ 3 dashboard tabs)
 - Phase 7: README, SYLLABUS_MAP.md, screenshots, two-PC node selection, clean Ctrl+C/SIGTERM
 
+## In Review
+- Dashboard rebuilt with React + shadcn/ui on branch `ui/shadcn` (from `ui/polish`), restyled after shadcndesign `dashboard-1`, light mode only. All 7 tabs keep their content and behaviour; API unchanged apart from a new `GET /api/meta`. Python 158/158, Vitest 23/23, tsc + eslint + build clean, all 7 demo steps clicked through in Playwright (1440px and 390px).
+
 ## Blocked
 - none
 
@@ -19,3 +22,7 @@ Branch: `build/phases-2-7` (main untouched). One commit per phase.
 - Helper modules beyond the brief's folder list: datalink/frame.py, network/transport.py, network/node.py, soc/state.py, soc/system.py, dashboard/inspector.py, datalink/experiment.py.
 - Two-PC mode: dashboard changes only affect the SOC PC's nodes; sensor retransmit/lost counters stay on the sensor PC.
 - lab_code/ had no source files, so framing/CRC/Dijkstra are textbook-style.
+- Deleted with Sahith's OK: old vanilla UI (`dashboard/templates/index.html`, `static/style.css`, `static/app.js`), IBM Plex fonts in `static/fonts/`, `docs/screenshots/emails-dark.png`, `diagnostics-dark.png`. Geist's OFL licences ship in `static/dist/fonts/`.
+- `@shadcndesign/dashboard-1` is a paid Pro block (not in the free registry), so it was not installed; the look was recreated from its public preview.
+- Brief items overridden by Sahith's "look like dashboard-1, light mode only": no dark mode, Geist instead of IBM Plex, black primary instead of blue, tinted severity pills.
+- Edited shadcn sources on purpose: toggle "on" = solid primary, severity Badge variants, roomier table cells, sheet overlay has no backdrop blur, use-mobile uses useSyncExternalStore (lint fix).
